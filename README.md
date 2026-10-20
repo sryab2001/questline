@@ -6,6 +6,10 @@ A habit tracker for Android, styled as the "System" from *Solo Leveling* with it
 - Build plan and phases: [docs/build-plan.md](docs/build-plan.md)
 - Behaviour design and the research behind it: [docs/behavior-design.md](docs/behavior-design.md)
 
+## Credentials and self-hosting
+
+There are no secrets in this repo. The sync server URL and your login are entered in the app and kept in the phone's secure storage; server accounts, data and certificates live only on your server; the Android signing key is held by EAS. To fork, change the Android package ID, run `eas init --force`, and host your own server. Full details: [SECURITY.md](SECURITY.md).
+
 ## Stack
 
 Expo SDK 57 (React Native + TypeScript), expo-router, expo-sqlite + Drizzle ORM (local-first), Reanimated, expo-audio. Syncs to a self-hosted PocketBase server (see [server/README.md](server/README.md) for the PC/Tailscale setup and [server/deploy/README.md](server/deploy/README.md) for a Linux VM).

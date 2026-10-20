@@ -48,3 +48,9 @@ server/pb_data/
 
 # Build output
 dist/
+
+# Local secrets (never commit)
+.env
+.env.*
+!.env.example
+*.keystore
