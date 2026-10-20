@@ -6,6 +6,12 @@ A habit tracker for Android, styled as the "System" from *Solo Leveling* with it
 - Build plan and phases: [docs/build-plan.md](docs/build-plan.md)
 - Behaviour design and the research behind it: [docs/behavior-design.md](docs/behavior-design.md)
 
+## License
+
+Questline is **source-available** under the [PolyForm Noncommercial License 1.0.0](LICENSE.md): you may use, study, modify and share it for any noncommercial purpose (personal use, learning, research, hobby projects, charities, schools). **Selling it, or using it commercially, requires the author's written permission.**
+
+The name "Questline" and its icon are not licensed for use in other apps, so a fork must use its own name and icon.
+
 ## Credentials and self-hosting
 
 There are no secrets in this repo. The sync server URL and your login are entered in the app and kept in the phone's secure storage; server accounts, data and certificates live only on your server; the Android signing key is held by EAS. To fork, change the Android package ID, run `eas init --force`, and host your own server. Full details: [SECURITY.md](SECURITY.md).
