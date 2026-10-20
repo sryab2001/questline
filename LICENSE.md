@@ -1,4 +1,4 @@
-Required Notice: Copyright (c) 2026 barathwaj (https://github.com/) — Questline
+Required Notice: Copyright (c) 2026 barathwaj — Questline
 
 # PolyForm Noncommercial License 1.0.0
 
