@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { SysButton } from '@/components/sys-button';
+import { SyncPanel } from '@/components/sync-panel';
 import { SysText } from '@/components/sys-text';
 import { SystemWindow } from '@/components/system-window';
 import { devSimulateMissedDay, deviceTimeZone, updateSettings } from '@/db/actions';
@@ -72,6 +73,8 @@ export default function SettingsScreen() {
             ) : null}
           </View>
         </SystemWindow>
+
+        <SyncPanel />
 
         <SystemWindow title="NOTIFICATIONS">
           <SysText>

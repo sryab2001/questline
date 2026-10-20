@@ -23,11 +23,23 @@ export function deviceTimeZone(): string {
 
 // ---------- settings ----------
 
-/** Creates the single settings row on first launch. */
+/**
+ * Creates the single settings row on first launch. It is stamped as the oldest
+ * possible version and not dirty, so restoring from the server always wins over
+ * a fresh install's defaults.
+ */
 export async function ensureSettings() {
   await db
     .insert(settings)
-    .values({ id: SETTINGS_ID, ...stamps(), playerName: 'Hunter', timeZone: deviceTimeZone(), resetHour: 0 })
+    .values({
+      id: SETTINGS_ID,
+      createdAt: new Date(),
+      updatedAt: new Date(0),
+      dirty: false,
+      playerName: 'Hunter',
+      timeZone: deviceTimeZone(),
+      resetHour: 0,
+    })
     .onConflictDoNothing();
 }
 

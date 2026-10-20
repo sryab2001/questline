@@ -1,9 +1,12 @@
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { createContext, type ReactNode, use, useEffect, useMemo } from 'react';
+import { AppState } from 'react-native';
 
 import { closePendingDays, dayResultsQuery, habitsQuery, logsQuery, settingsQuery, toEngineHabit } from '@/db/actions';
 import { computeState, dayKey, type DayOutcome, type DaySummary, type Habit, type PlayerState } from '@/engine';
 import { syncReminders } from '@/notifications';
+import { initSync, syncNow } from '@/sync/engine';
+import { useSyncStatus } from '@/sync/status';
 
 import { useNow } from './use-now';
 
@@ -26,14 +29,18 @@ export interface PlayerData {
 
 const PlayerContext = createContext<PlayerData | null>(null);
 
-function useComputePlayer(): PlayerData | null {
+const SYNC_DEBOUNCE_MS = 4000;
+
+function useComputePlayer(): { player: PlayerData | null; dataVersion: object } {
   const { data: settingsRows } = useLiveQuery(settingsQuery());
   const { data: habitRows } = useLiveQuery(habitsQuery());
   const { data: logRows } = useLiveQuery(logsQuery());
   const { data: resultRows } = useLiveQuery(dayResultsQuery());
   const now = useNow();
+  // Changes identity whenever any synced table changes (not on the minute tick).
+  const dataVersion = useMemo(() => [settingsRows, habitRows, logRows, resultRows], [settingsRows, habitRows, logRows, resultRows]);
 
-  return useMemo(() => {
+  const player = useMemo(() => {
     const s = settingsRows[0];
     if (!s) return null;
     const habits = habitRows.map(toEngineHabit);
@@ -62,18 +69,34 @@ function useComputePlayer(): PlayerData | null {
       unseenFailures: state.history.filter((d) => d.failed && unseen.has(d.day)),
     };
   }, [settingsRows, habitRows, logRows, resultRows, now]);
+  return { player, dataVersion };
 }
 
 /** Computes player state once for the whole app and runs the game's side effects. */
 export function PlayerProvider({ children }: { children: ReactNode }) {
-  const player = useComputePlayer();
+  const { player, dataVersion } = useComputePlayer();
 
-  // Close finished days whenever the day changes or the habit list changes.
+  // Sync: on start, when returning to the app, and a few seconds after local changes.
+  useEffect(() => {
+    initSync().then(() => syncNow());
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') syncNow();
+    });
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    const t = setTimeout(() => syncNow(), SYNC_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [dataVersion]);
+
+  // Close finished days whenever the day or habit list changes, but never mid-sync:
+  // during a restore the logs may not have arrived yet.
+  const syncState = useSyncStatus().state;
   const today = player?.today;
   const habitCount = player?.habits.length ?? 0;
   useEffect(() => {
-    if (today) closePendingDays();
-  }, [today, habitCount]);
+    if (today && syncState !== 'syncing') closePendingDays();
+  }, [today, habitCount, syncState]);
 
   // Keep scheduled reminders in step with today's progress and settings.
   const plan = player && {
