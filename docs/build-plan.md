@@ -12,7 +12,7 @@ How we turn the design ([game-design.md](game-design.md)) and the screen mockups
 
 | Layer | Choice | Why |
 |---|---|---|
-| App framework | Expo (latest SDK) + React Native + TypeScript | Officially recommended way to build React Native apps; no Android Studio needed |
+| App framework | Expo SDK 57 (matches Expo Go on the Play Store) + React Native + TypeScript | Officially recommended way to build React Native apps; no Android Studio needed |
 | Navigation | expo-router | File-based routes (`app/quests.tsx`, `app/status.tsx` ...) |
 | Local database | expo-sqlite + Drizzle ORM | Typed schema, migrations, live queries that re-render screens when data changes |
 | Game logic | Pure TypeScript module (`src/engine`) | Testable, rebalanced without data migrations |
