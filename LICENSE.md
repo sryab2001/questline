@@ -1,4 +1,4 @@
-Required Notice: Copyright (c) 2026 barathwaj — Questline
+Required Notice: Copyright (c) 2026 Aouthithiye Barathwaj SR Y (https://github.com/sryab2001)
 
 # PolyForm Noncommercial License 1.0.0
 
