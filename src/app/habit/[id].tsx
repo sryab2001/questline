@@ -27,6 +27,10 @@ export default function HabitEditor() {
   const [unit, setUnit] = useState('');
   const [grade, setGrade] = useState<Grade>('E');
   const [days, setDays] = useState<number[] | 'daily'>('daily');
+  const [cue, setCue] = useState('');
+  const [place, setPlace] = useState('');
+  const [bundle, setBundle] = useState('');
+  const [minTarget, setMinTarget] = useState('');
 
   useEffect(() => {
     if (isNew) return;
@@ -39,12 +43,23 @@ export default function HabitEditor() {
       setUnit(h.unit);
       setGrade(h.grade);
       setDays(h.schedule === 'daily' ? 'daily' : h.schedule.split(',').map(Number));
+      setCue(h.cue);
+      setPlace(h.place);
+      setBundle(h.bundle);
+      setMinTarget(h.minTarget ? String(h.minTarget) : '');
       setLoaded(true);
     });
   }, [id, isNew]);
 
   const targetNum = simple ? 1 : Number(target.replace(',', '.'));
-  const valid = name.trim().length > 0 && Number.isFinite(targetNum) && targetNum > 0 && (days === 'daily' || days.length > 0);
+  const minNum = minTarget.trim() ? Number(minTarget.replace(',', '.')) : null;
+  const minValid = minNum === null || (Number.isFinite(minNum) && minNum > 0 && minNum < targetNum);
+  const valid =
+    name.trim().length > 0 && Number.isFinite(targetNum) && targetNum > 0 && minValid && (days === 'daily' || days.length > 0);
+
+  const what = name.trim() || 'this quest';
+  const action = simple ? what.toLowerCase() : [`do ${target}`, unit.trim(), `of ${what}`].filter(Boolean).join(' ');
+  const triggerLine = `After I ${cue.trim()}, I will ${action}${place.trim() ? ` (${place.trim()})` : ''}.`;
 
   const save = async () => {
     const input: HabitInput = {
@@ -54,6 +69,10 @@ export default function HabitEditor() {
       unit: simple ? '' : unit.trim(),
       grade,
       schedule: days === 'daily' ? 'daily' : [...days].sort().join(','),
+      cue: cue.trim(),
+      place: place.trim(),
+      bundle: bundle.trim(),
+      minTarget: simple ? null : minNum,
     };
     if (isNew) await addHabits([input]);
     else await updateHabit(id, input);
@@ -168,6 +187,61 @@ export default function HabitEditor() {
             </Field>
           </SystemWindow>
 
+          <SystemWindow title="TRIGGER">
+            <SysText variant="caption" style={{ lineHeight: 18 }}>
+              Tie the quest to something you already do. If-then plans make follow-through much more likely, and the cue,
+              not the app, is what turns it into a habit.
+            </SysText>
+            <Field label="AFTER I…">
+              <TextInput
+                value={cue}
+                onChangeText={setCue}
+                placeholder="brush my teeth in the morning"
+                placeholderTextColor={colors.textDone}
+                style={styles.input}
+                accessibilityLabel="Trigger: after I"
+              />
+            </Field>
+            <Field label="WHERE (OPTIONAL)">
+              <TextInput
+                value={place}
+                onChangeText={setPlace}
+                placeholder="bedroom floor"
+                placeholderTextColor={colors.textDone}
+                style={styles.input}
+                accessibilityLabel="Place"
+              />
+            </Field>
+            {cue.trim() ? <SysText style={styles.preview}>{triggerLine}</SysText> : null}
+          </SystemWindow>
+
+          <SystemWindow title="BAD DAYS">
+            {!simple ? (
+              <Field label="MINIMUM CLEAR" hint="Keeps your streak">
+                <TextInput
+                  value={minTarget}
+                  onChangeText={setMinTarget}
+                  placeholder={`e.g. ${Math.max(1, Math.round(targetNum * 0.2) || 1)}`}
+                  placeholderTextColor={colors.textDone}
+                  keyboardType="numeric"
+                  style={styles.input}
+                  accessibilityLabel="Minimum clear amount"
+                />
+              </Field>
+            ) : null}
+            {!minValid ? <SysText style={{ color: colors.dangerSoft, fontSize: 12 }}>The minimum must be smaller than the target.</SysText> : null}
+            <Field label="ONLY WHILE… (OPTIONAL)" hint="Pair it with a treat">
+              <TextInput
+                value={bundle}
+                onChangeText={setBundle}
+                placeholder="listening to my audiobook"
+                placeholderTextColor={colors.textDone}
+                style={styles.input}
+                accessibilityLabel="Only while"
+              />
+            </Field>
+          </SystemWindow>
+
           <SysButton label={isNew ? 'ACCEPT QUEST' : 'SAVE'} onPress={save} disabled={!valid} />
           {!isNew ? <SysButton label="DELETE QUEST" variant="ghost" onPress={remove} /> : null}
         </ScrollView>
@@ -205,4 +279,5 @@ const styles = StyleSheet.create({
   },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  preview: { fontSize: 13, lineHeight: 20, color: colors.cyan, fontFamily: fonts.bodyMedium },
 });

@@ -25,6 +25,13 @@ describe('toRemote', () => {
         sortOrder: 0,
         archived: false,
         startDay: '2026-10-20',
+        cue: 'get out of bed',
+        place: '',
+        bundle: '',
+        minTarget: null,
+        masteredAt: null,
+        masteryName: '',
+        masteryTitle: '',
       },
       USER,
     );
@@ -43,6 +50,13 @@ describe('toRemote', () => {
       sort_order: 0,
       archived: false,
       start_day: '2026-10-20',
+      cue: 'get out of bed',
+      place: '',
+      bundle: '',
+      min_target: 0,
+      mastered_at: 0,
+      mastery_name: '',
+      mastery_title: '',
     });
     expect(body).not.toHaveProperty('dirty');
   });
@@ -152,6 +166,13 @@ describe('toLocal', () => {
       sortOrder: 2,
       archived: true,
       startDay: '2026-10-01',
+      cue: 'finish dinner',
+      place: 'desk',
+      bundle: 'lo-fi playlist',
+      minTarget: null,
+      masteredAt: new Date(5000),
+      masteryName: 'Scholar',
+      masteryTitle: 'The Scholar',
     };
     const remote = { ...toRemote(t, original, USER), updated: 'x' } as unknown as PbRecord;
     expect(toLocal(t, remote)).toEqual(original);

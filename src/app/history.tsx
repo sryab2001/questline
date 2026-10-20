@@ -7,15 +7,18 @@ import { prettyDay } from '@/components/penalty-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { SysText } from '@/components/sys-text';
 import { SystemWindow } from '@/components/system-window';
-import { addDays, type DaySummary, weekday } from '@/engine';
+import { RARITY_COLOR } from '@/components/gain-toast';
+import { addDays, type DaySummary, describeDrop, weekday } from '@/engine';
 import { usePlayerState } from '@/hooks/use-player-state';
 import { colors, fonts } from '@/theme';
 
-type Kind = 'cleared' | 'failed' | 'shielded' | 'rested' | 'empty' | 'today' | 'none';
+type Kind = 'cleared' | 'min' | 'slip' | 'failure' | 'shielded' | 'rested' | 'empty' | 'today' | 'none';
 
 const LOOK: Record<Kind, { bg: string; border: string; text: string; label: string }> = {
   cleared: { bg: '#123a5c', border: colors.cyan, text: colors.text, label: 'Cleared' },
-  failed: { bg: '#3a1219', border: colors.dangerSoft, text: '#fbe9eb', label: 'Failed' },
+  min: { bg: '#0e2433', border: '#3d7fa3', text: colors.textSoft, label: 'Minimum' },
+  slip: { bg: '#2a2210', border: colors.gold, text: '#ffe2a3', label: 'Slip' },
+  failure: { bg: '#3a1219', border: colors.dangerSoft, text: '#fbe9eb', label: 'Failed' },
   shielded: { bg: '#241a40', border: colors.epic, text: colors.text, label: 'Shielded' },
   rested: { bg: '#161a2c', border: '#7b7fb0', text: colors.textMuted, label: 'Rest day' },
   empty: { bg: 'transparent', border: colors.borderMuted, text: colors.textDone, label: 'Nothing scheduled' },
@@ -24,12 +27,7 @@ const LOOK: Record<Kind, { bg: string; border: string; text: string; label: stri
 };
 
 function kindOf(d: DaySummary | undefined): Kind {
-  if (!d) return 'none';
-  if (d.rested) return 'rested';
-  if (d.shielded) return 'shielded';
-  if (d.failed) return 'failed';
-  if (d.total === 0) return 'empty';
-  return 'cleared';
+  return d ? d.kind : 'none';
 }
 
 function monthKey(day: string) {
@@ -58,8 +56,8 @@ export default function HistoryScreen() {
 
   const days = cells.filter((d): d is string => !!d).map((d) => byDay.get(d)).filter((d): d is DaySummary => !!d);
   const summary = {
-    cleared: days.filter((d) => kindOf(d) === 'cleared').length,
-    failed: days.filter((d) => kindOf(d) === 'failed').length,
+    kept: days.filter((d) => d.kind === 'cleared' || d.kind === 'min').length,
+    failed: days.filter((d) => d.kind === 'slip' || d.kind === 'failure').length,
     xp: days.reduce((s, d) => s + d.xpGained - d.xpLost, 0),
     gold: days.reduce((s, d) => s + d.goldGained, 0),
   };
@@ -122,7 +120,7 @@ export default function HistoryScreen() {
           </View>
 
           <View style={styles.legend}>
-            {(['cleared', 'failed', 'shielded', 'rested'] as Kind[]).map((k) => (
+            {(['cleared', 'min', 'slip', 'failure', 'shielded', 'rested'] as Kind[]).map((k) => (
               <View key={k} style={styles.legendItem}>
                 <View style={[styles.swatch, { backgroundColor: LOOK[k].bg, borderColor: LOOK[k].border }]} />
                 <SysText variant="caption" style={{ fontSize: 11 }}>
@@ -133,15 +131,15 @@ export default function HistoryScreen() {
           </View>
 
           <View style={styles.summary}>
-            <Stat label="Cleared" value={String(summary.cleared)} color={colors.cyan} />
-            <Stat label="Failed" value={String(summary.failed)} color={colors.dangerSoft} />
+            <Stat label="Kept" value={String(summary.kept)} color={colors.cyan} />
+            <Stat label="Missed" value={String(summary.failed)} color={colors.dangerSoft} />
             <Stat label="EXP" value={`${summary.xp >= 0 ? '+' : ''}${summary.xp}`} />
             <Stat label="Gold" value={`+${summary.gold}`} color={colors.gold} />
           </View>
         </SystemWindow>
 
         {selected ? (
-          <SystemWindow title={prettyDay(selected).toUpperCase()} variant={detail?.failed && !detail.shielded && !detail.rested ? 'danger' : 'system'}>
+          <SystemWindow title={prettyDay(selected).toUpperCase()} variant={detail?.kind === 'failure' ? 'danger' : detail?.kind === 'slip' ? 'gold' : 'system'}>
             {isToday ? (
               <>
                 <SysText>
@@ -157,11 +155,23 @@ export default function HistoryScreen() {
                   {LOOK[kindOf(detail)].label} · {detail.cleared}/{detail.total} goals
                   {detail.survival ? ` · Penalty quest ${detail.survival}` : ''}
                 </SysText>
+                {detail.comeback ? <SysText style={{ color: colors.gold }}>[Recovered] comeback bonus</SysText> : null}
+                {detail.criticals.length ? <SysText style={{ color: colors.gold }}>Critical Clear: {detail.criticals.join(', ')}</SysText> : null}
+                {detail.drops.map((d, i) => (
+                  <SysText key={`drop${i}`} style={{ color: RARITY_COLOR[d.rarity], fontSize: 13 }}>
+                    [{d.rarity}] {describeDrop(d)}
+                  </SysText>
+                ))}
                 {detail.done.map((n) => (
                   <GoalLine key={`d${n}`} name={n} done />
                 ))}
                 {detail.missed.map((n) => (
                   <GoalLine key={`m${n}`} name={n} done={false} />
+                ))}
+                {detail.strength.map((c) => (
+                  <SysText key={`s${c.habitId}`} variant="caption" style={{ fontVariant: ['tabular-nums'] }}>
+                    {c.name}: habit {Math.round(c.before)}% → {Math.round(c.after)}%
+                  </SysText>
                 ))}
                 <View style={styles.summary}>
                   <Stat label="EXP" value={`+${detail.xpGained}${detail.xpLost ? ` −${detail.xpLost}` : ''}`} />

@@ -52,6 +52,10 @@ export interface ReminderPlan {
   restedToday: boolean;
   /** End of a running penalty quest (ms), if any. */
   survivalDeadline: number | null;
+  /** Trigger lines for today's unfinished quests, e.g. "After brushing teeth → Push-ups". */
+  cues: string[];
+  /** The last missed day was a Slip: missing today makes it a Failure. */
+  streakAtRisk: boolean;
 }
 
 /** Replaces every scheduled reminder with a fresh set built from the current state. */
@@ -63,7 +67,9 @@ export async function syncReminders(plan: ReminderPlan, now = new Date()) {
   await Notifications.scheduleNotificationAsync({
     content: {
       title: '[Daily Quest has arrived]',
-      body: 'Preparation to Become Powerful. Your goals await, Player.',
+      body: plan.cues.length
+        ? plan.cues.slice(0, 3).join(' · ')
+        : 'Preparation to Become Powerful. Your goals await, Player.',
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -86,7 +92,9 @@ export async function syncReminders(plan: ReminderPlan, now = new Date()) {
         title: 'WARNING',
         body:
           i === 0
-            ? `${remaining} goal${remaining === 1 ? '' : 's'} remain. Failure to complete the Daily Quest will result in a penalty.`
+            ? plan.streakAtRisk
+              ? `${remaining} goal${remaining === 1 ? '' : 's'} remain. You slipped once. Do not miss twice.`
+              : `${remaining} goal${remaining === 1 ? '' : 's'} remain. A minimum clear still keeps your streak.`
             : 'The Daily Quest is not complete. Failure will result in a penalty.',
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at, channelId: CHANNEL_ID },

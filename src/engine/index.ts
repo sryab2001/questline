@@ -5,3 +5,5 @@ export * from './state';
 export * from './types';
 export * from './store';
 export * from './survival';
+export * from './drops';
+export * from './random';

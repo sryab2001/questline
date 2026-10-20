@@ -42,6 +42,17 @@ export default function HabitsScreen() {
                     <SysText variant="caption">
                       {targetText(h)} · {scheduleText(h)} · Grade {h.grade}
                     </SysText>
+                    {h.cue ? (
+                      <SysText style={{ fontSize: 11, color: colors.cyan }} numberOfLines={1}>
+                        After {h.cue}
+                      </SysText>
+                    ) : (
+                      <SysText style={{ fontSize: 11, color: colors.gold }}>No trigger set: tap to add one</SysText>
+                    )}
+                    <SysText variant="caption" style={{ fontSize: 11 }}>
+                      Strength {Math.round(player.state.habits[h.id]?.strength ?? 0)}%
+                      {h.mastered ? ' · Passive Skill' : ''}
+                    </SysText>
                   </View>
                   <SysText style={styles.stat}>+{h.stat}</SysText>
                   <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textMuted} />

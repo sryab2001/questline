@@ -27,6 +27,10 @@ export const settings = sqliteTable('settings', {
   /** Finished the first-run Awakening flow. */
   onboarded: integer('onboarded', { mode: 'boolean' }).notNull().default(false),
   soundOn: integer('sound_on', { mode: 'boolean' }).notNull().default(true),
+  /** Surprise drops and Critical Clears. */
+  surprisesOn: integer('surprises_on', { mode: 'boolean' }).notNull().default(true),
+  /** Equipped title shown on the Status window. */
+  title: text('title').notNull().default(''),
 });
 
 export const habits = sqliteTable('habits', {
@@ -40,6 +44,17 @@ export const habits = sqliteTable('habits', {
   sortOrder: integer('sort_order').notNull().default(0),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
   startDay: text('start_day').notNull(),
+  /** Implementation intention: "After I <cue>". */
+  cue: text('cue').notNull().default(''),
+  place: text('place').notNull().default(''),
+  /** Temptation bundle: "Only while <bundle>". */
+  bundle: text('bundle').notNull().default(''),
+  /** Minimum Clear amount for bad days. */
+  minTarget: real('min_target'),
+  /** Became a Passive Skill. */
+  masteredAt: integer('mastered_at', { mode: 'timestamp_ms' }),
+  masteryName: text('mastery_name').notNull().default(''),
+  masteryTitle: text('mastery_title').notNull().default(''),
 });
 
 export const logs = sqliteTable(
@@ -115,4 +130,22 @@ export const classQuests = sqliteTable('class_quests', {
   stepsJson: text('steps_json').notNull(),
   currentStep: integer('current_step').notNull().default(0),
   status: text('status', { enum: ['active', 'cleared', 'abandoned'] }).notNull().default('active'),
+});
+
+/** Weekly automaticity check-ins (SRBAI, four 1–7 answers). */
+export const checkins = sqliteTable('checkins', {
+  ...syncColumns,
+  habitId: text('habit_id').notNull(),
+  day: text('day').notNull(),
+  scoresJson: text('scores_json').notNull(),
+  avg: real('avg').notNull(),
+});
+
+/** Small player decisions and "seen" markers: offer answers, recaps shown, re-plans done. */
+export const events = sqliteTable('events', {
+  ...syncColumns,
+  kind: text('kind').notNull(),
+  ref: text('ref').notNull(),
+  day: text('day').notNull(),
+  dataJson: text('data_json'),
 });

@@ -38,6 +38,8 @@ export const SYNC_TABLES: SyncTable[] = [
   table('skill_uses', schema.skillUses),
   table('unlocks', schema.unlocks),
   table('class_quests', schema.classQuests),
+  table('checkins', schema.checkins),
+  table('events', schema.events),
 ];
 
 const SKIP = new Set(['dirty']);
@@ -71,7 +73,9 @@ export function toLocal(t: SyncTable, rec: PbRecord): Record<string, unknown> {
       continue;
     }
     const v = rec[col.name];
-    const empty = v === undefined || v === null || v === '' || (col.dataType === 'date' && v === 0);
+    // PocketBase stores "no value" as 0 / ''; nullable columns get null back.
+    const empty =
+      v === undefined || v === null || v === '' || ((col.dataType === 'date' || col.dataType === 'number') && v === 0);
     if (empty && !col.notNull) {
       row[key] = null;
     } else if (col.dataType === 'date') {

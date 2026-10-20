@@ -1,4 +1,5 @@
 import type { DayKey } from './day';
+import type { Drop } from './drops';
 import type { Grade, Rank, SkillId, Stat } from './rules';
 
 /** `daily`, or a comma-separated list of weekdays (0 = Sunday), e.g. "1,3,5". */
@@ -15,6 +16,16 @@ export interface Habit {
   /** First day this habit counts. */
   startDay: DayKey;
   archived: boolean;
+  /** "Bad day" version; reaching it is a Minimum Clear. */
+  minTarget?: number | null;
+  /** Became a Passive Skill. */
+  mastered?: boolean;
+  // Display-only metadata (ignored by the engine).
+  cue?: string;
+  place?: string;
+  bundle?: string;
+  masteryName?: string;
+  masteryTitle?: string;
 }
 
 export interface LogEntry {
@@ -30,6 +41,10 @@ export interface GoalOutcome {
   stat: Stat;
   grade: Grade;
   done: boolean;
+  /** Reached the minimum but not the full target. */
+  min?: boolean;
+  /** Was a (non-weakened) Passive Skill that day. */
+  mastered?: boolean;
 }
 
 export type SurvivalStatus = 'active' | 'cleared' | 'failed';
@@ -67,6 +82,22 @@ export interface Allocation {
   points: number;
 }
 
+export interface Checkin {
+  habitId: string;
+  day: DayKey;
+  /** Mean of the four SRBAI answers, 1–7. */
+  avg: number;
+}
+
+export type OfferKind = 'up' | 'down' | 'mastery';
+
+/** Player's answer to an offer, so it isn't repeated too soon. */
+export interface OfferDecision {
+  habitId: string;
+  kind: OfferKind;
+  day: DayKey;
+}
+
 export interface EngineInput {
   habits: Habit[];
   logs: LogEntry[];
@@ -76,6 +107,10 @@ export interface EngineInput {
   purchases?: Purchase[];
   skillUses?: SkillUse[];
   allocations?: Allocation[];
+  checkins?: Checkin[];
+  decisions?: OfferDecision[];
+  /** Surprise drops and Critical Clears (default on). */
+  surprises?: boolean;
 }
 
 export interface GoalProgress {
@@ -85,19 +120,39 @@ export interface GoalProgress {
   unit: string;
   progress: number;
   target: number;
+  minTarget: number | null;
   done: boolean;
+  /** Reached the minimum but not the target. */
+  min: boolean;
+  mastered: boolean;
+  weakened: boolean;
+}
+
+/**
+ * cleared: every goal fully done · min: every goal at least at its minimum ·
+ * slip: first miss · failure: second miss in a row · shielded: a failure a Shield absorbed ·
+ * rested: Rest Day · empty: nothing scheduled
+ */
+export type DayKind = 'cleared' | 'min' | 'slip' | 'failure' | 'shielded' | 'rested' | 'empty';
+
+export interface StrengthChange {
+  habitId: string;
+  name: string;
+  before: number;
+  after: number;
 }
 
 export interface DaySummary {
   day: DayKey;
+  kind: DayKind;
   cleared: number;
   total: number;
-  /** Had scheduled goals and missed at least one (even if shielded or rested). */
+  /** Missed at least one goal (even if shielded or rested). */
   failed: boolean;
-  /** A Streak Shield absorbed the failure. */
   shielded: boolean;
-  /** Rest Day was used. */
   rested: boolean;
+  /** Kept the day right after a missed one. */
+  comeback: boolean;
   survival: SurvivalStatus | null;
   xpGained: number;
   /** EXP actually lost to the penalty (after the level floor). */
@@ -106,6 +161,43 @@ export interface DaySummary {
   hpChange: number;
   missed: string[];
   done: string[];
+  drops: Drop[];
+  criticals: string[];
+  strength: StrengthChange[];
+}
+
+export interface HabitStat {
+  /** 0–100 habit strength. */
+  strength: number;
+  completions: number;
+  mastered: boolean;
+  weakened: boolean;
+  /** Mean of the latest automaticity check-in, if any. */
+  lastCheckin: number | null;
+  checkinDue: boolean;
+  masteryReady: boolean;
+}
+
+export interface QuestOffer {
+  habitId: string;
+  name: string;
+  kind: 'up' | 'down';
+  fromTarget: number;
+  toTarget: number;
+  /** Suggested minimum for a downgrade when the quest has none. */
+  suggestMin: number | null;
+  unit: string;
+}
+
+export interface GateState {
+  /** Monday of this week. */
+  weekStart: DayKey;
+  /** Kept days so far this week (today counts once kept). */
+  kept: number;
+  required: number;
+  complete: boolean;
+  /** Per weekday Mon..Sun: kept, missed, open (today/future), or none (nothing scheduled). */
+  days: ('kept' | 'missed' | 'open' | 'none')[];
 }
 
 export interface PlayerState {
@@ -115,6 +207,8 @@ export interface PlayerState {
   xpForNext: number;
   rank: Rank;
   stats: Record<Stat, number>;
+  /** Part of each stat that comes from Passive Skills. */
+  passiveBonus: Record<Stat, number>;
   hp: number;
   maxHp: number;
   mp: number;
@@ -123,16 +217,29 @@ export interface PlayerState {
   abilityPoints: { earned: number; spent: number; available: number };
   /** Streak Shields owned and not yet used. */
   shields: number;
-  /** Consecutive fully-cleared days, counting today only once it is cleared. Rest and shielded days don't break it. */
+  /** Consecutive kept days. Slips, rest and shielded days don't break it; failures do. */
   streak: number;
+  /** The last missed day was a Slip and today isn't kept yet: miss today and it's a Failure. */
+  streakAtRisk: boolean;
+  nextMilestone: number | null;
   /** One entry per closed day, oldest first. */
   history: DaySummary[];
   skills: Record<SkillId, { unlocked: boolean; activeToday: boolean; canUse: boolean }>;
+  habits: Record<string, HabitStat>;
+  offers: QuestOffer[];
+  gate: GateState;
+  /** Titles earned from finished Seasons (calendar months), oldest first. */
+  seasonTitles: { month: string; title: string; keptDays: number }[];
   today: {
     goals: GoalProgress[];
     cleared: number;
     total: number;
     allCleared: boolean;
+    /** Every goal at least at its minimum. */
+    kept: boolean;
     rested: boolean;
+    comeback: boolean;
+    drops: Drop[];
+    criticals: string[];
   };
 }

@@ -4,6 +4,7 @@ A habit tracker for Android, styled as the "System" from *Solo Leveling* with it
 
 - Game design: [docs/game-design.md](docs/game-design.md)
 - Build plan and phases: [docs/build-plan.md](docs/build-plan.md)
+- Behaviour design and the research behind it: [docs/behavior-design.md](docs/behavior-design.md)
 
 ## Stack
 
@@ -34,7 +35,8 @@ Expo SDK 57 (React Native + TypeScript), expo-router, expo-sqlite + Drizzle ORM 
 src/
   app/          expo-router screens: (tabs)/ Quests, Status, Store, Class; awakening (onboarding),
                 habit editor, habits, history (calendar), settings
-  engine/       pure game logic: days, levels, ranks, economy, survival, boxes (no React, no DB) + tests
+  engine/       pure game logic: days, levels, ranks, economy, survival, boxes, habit strength,
+                slips/comebacks, drops, gates, offers, seasons (no React, no DB) + tests
   sync/         PocketBase client, table mapping, push/pull engine, status store
   sound/        sound effect playback
   notifications/ scheduled System reminders

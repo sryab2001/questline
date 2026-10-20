@@ -5,12 +5,13 @@ import { levelFromTotalXp } from './level';
 import {
   BASE_STAT,
   CLEARED_DAY_HP_GAIN,
+  COMEBACK_BONUS,
   DAILY_CLEAR_BONUS_XP,
   FAILED_DAY_HP_LOSS,
   FAILED_DAY_PENALTY_XP,
   GOAL_XP,
   MAX_HP,
-  xpToNextLevel,
+  SLIP_PENALTY_FACTOR,
 } from './rules';
 import { computeState, daysToClose, evaluateDay, isScheduled, progressFor } from './state';
 import type { Habit, LogEntry } from './types';
@@ -30,10 +31,10 @@ const habit = (over: Partial<Habit> = {}): Habit => ({
 
 const log = (habitId: string, day: string, amount: number): LogEntry => ({ habitId, day, amount });
 
-/** Closes every day before `today` the way the app does, then computes state. */
+/** Closes every day before `today` the way the app does, then computes state (no surprises). */
 function run(habits: Habit[], logs: LogEntry[], today: string) {
   const closedDays = daysToClose(habits, new Set(), today).map((d) => evaluateDay(habits, logs, d));
-  return computeState({ habits, logs, closedDays, today });
+  return computeState({ habits, logs, closedDays, today, surprises: false });
 }
 
 describe('isScheduled', () => {
@@ -70,9 +71,9 @@ describe('daysToClose', () => {
 describe('computeState', () => {
   it('starts a new player at level 1, E-rank, full HP, base stats', () => {
     const s = computeState({ habits: [], logs: [], closedDays: [], today: '2026-10-20' });
-    expect(s).toMatchObject({ totalXp: 0, level: 1, rank: 'E', streak: 0, hp: MAX_HP, history: [] });
+    expect(s).toMatchObject({ totalXp: 0, level: 1, rank: 'E', streak: 0, hp: MAX_HP, history: [], streakAtRisk: false });
     expect(s.stats.STR).toBe(BASE_STAT);
-    expect(s.today).toEqual({ goals: [], cleared: 0, total: 0, allCleared: false, rested: false });
+    expect(s.today).toMatchObject({ goals: [], cleared: 0, total: 0, allCleared: false, kept: false, rested: false, comeback: false });
   });
 
   it("counts today's EXP provisionally, with the clear bonus once every goal is done", () => {
@@ -83,53 +84,58 @@ describe('computeState', () => {
     expect(full.today.allCleared).toBe(true);
   });
 
-  it('applies a penalty for a failed day, but never drops a level', () => {
-    // Day 1 cleared: E goal + bonus. Day 2 missed.
+  it('a first miss is a Slip: half penalty, never drops a level', () => {
     const habits = [habit({ startDay: '2026-10-18' })];
     const s = run(habits, [log('pushups', '2026-10-18', 100)], '2026-10-20');
     const earned = GOAL_XP.E + DAILY_CLEAR_BONUS_XP;
-    expect(s.history.map((d) => d.failed)).toEqual([false, true]);
-    const expectedLoss = Math.min(FAILED_DAY_PENALTY_XP, levelFromTotalXp(earned).xpIntoLevel);
+    expect(s.history.map((d) => d.kind)).toEqual(['cleared', 'slip']);
+    const expectedLoss = Math.min(Math.round(FAILED_DAY_PENALTY_XP * SLIP_PENALTY_FACTOR), levelFromTotalXp(earned).xpIntoLevel);
     expect(s.history[1].xpLost).toBe(expectedLoss);
     expect(s.history[1].missed).toEqual(['Push-ups']);
-    expect(s.totalXp).toBe(earned - expectedLoss);
     expect(s.level).toBe(levelFromTotalXp(earned).level);
   });
 
-  it('caps the penalty at the EXP inside the current level', () => {
-    // Enough clears to reach level 2 with a small remainder, then fail.
-    const days = dayRange('2026-10-01', '2026-10-19');
-    const habits = [habit({ startDay: '2026-10-01', grade: 'S' })];
-    const logs = days.slice(0, -1).map((d) => log('pushups', d, 100)); // last day missed
-    const s = run(habits, logs, '2026-10-20');
-    const beforeFail = s.totalXp + s.history[s.history.length - 1].xpLost;
-    expect(levelFromTotalXp(s.totalXp).level).toBe(levelFromTotalXp(beforeFail).level);
-    expect(s.level).toBeGreaterThan(1);
-    expect(xpToNextLevel(1)).toBeGreaterThan(0);
+  it('a second miss in a row is a Failure with the full penalty', () => {
+    const habits = [habit({ startDay: '2026-10-17' })];
+    const s = run(habits, [log('pushups', '2026-10-17', 100)], '2026-10-20');
+    expect(s.history.map((d) => d.kind)).toEqual(['cleared', 'slip', 'failure']);
+    expect(s.history[2].hpChange).toBe(-FAILED_DAY_HP_LOSS);
   });
 
-  it('loses HP on failed days and regains it on cleared days, within 0..MAX', () => {
+  it('HP: slip costs half, failure full, kept days restore', () => {
     const habits = [habit({ startDay: '2026-10-16' })];
-    // 16 fail, 17 fail, 18 clear, 19 clear
+    // 16 slip, 17 failure, 18 cleared (comeback), 19 cleared
     const logs = [log('pushups', '2026-10-18', 100), log('pushups', '2026-10-19', 100)];
     const s = run(habits, logs, '2026-10-20');
-    expect(s.hp).toBe(MAX_HP - 2 * FAILED_DAY_HP_LOSS + 2 * CLEARED_DAY_HP_GAIN);
+    expect(s.hp).toBe(MAX_HP - Math.round(FAILED_DAY_HP_LOSS * SLIP_PENALTY_FACTOR) - FAILED_DAY_HP_LOSS + 2 * CLEARED_DAY_HP_GAIN);
   });
 
-  it('counts the streak back from yesterday while today is still open', () => {
+  it('pays a comeback bonus for the day after a miss', () => {
     const habits = [habit({ startDay: '2026-10-18' })];
-    const logs = [log('pushups', '2026-10-18', 100), log('pushups', '2026-10-19', 100)];
-    expect(run(habits, logs, '2026-10-20').streak).toBe(2);
-    expect(run(habits, [...logs, log('pushups', '2026-10-20', 100)], '2026-10-20').streak).toBe(3);
+    const s = run(habits, [log('pushups', '2026-10-19', 100)], '2026-10-20');
+    expect(s.history[1]).toMatchObject({ kind: 'cleared', comeback: true });
+    const base = GOAL_XP.E + DAILY_CLEAR_BONUS_XP;
+    expect(s.history[1].xpGained).toBe(base + Math.round(base * COMEBACK_BONUS));
   });
 
-  it('resets the streak after a failed day and skips days with nothing scheduled', () => {
-    const daily = [habit({ startDay: '2026-10-18' })];
-    expect(run(daily, [log('pushups', '2026-10-18', 100)], '2026-10-20').streak).toBe(0);
+  it('streak: slips bend it, failures break it, empty days are neutral', () => {
+    const daily = [habit({ startDay: '2026-10-17' })];
+    // 17 clear, 18 slip, 19 clear → streak 2, today open
+    const bent = run(daily, [log('pushups', '2026-10-17', 100), log('pushups', '2026-10-19', 100)], '2026-10-20');
+    expect(bent.streak).toBe(2);
+    // 17 clear, 18 slip, 19 failure → broken
+    expect(run(daily, [log('pushups', '2026-10-17', 100)], '2026-10-20').streak).toBe(0);
 
     // Mon/Wed/Fri habit: 2026-10-19 Mon cleared, Tue nothing scheduled, today Wed open.
     const mwf = [habit({ schedule: '1,3,5', startDay: '2026-10-19' })];
     expect(run(mwf, [log('pushups', '2026-10-19', 100)], '2026-10-21').streak).toBe(1);
+  });
+
+  it('flags the streak at risk the day after a Slip', () => {
+    const habits = [habit({ startDay: '2026-10-18' })];
+    const s = run(habits, [log('pushups', '2026-10-18', 100)], '2026-10-20');
+    expect(s.streakAtRisk).toBe(true);
+    expect(run(habits, [log('pushups', '2026-10-18', 100), log('pushups', '2026-10-20', 100)], '2026-10-20').streakAtRisk).toBe(false);
   });
 
   it('freezes closed days: editing a habit later does not rewrite history', () => {
@@ -137,8 +143,8 @@ describe('computeState', () => {
     const logs = [log('pushups', '2026-10-19', 100)];
     const closedDays = [evaluateDay(habits, logs, '2026-10-19')];
     const harder = [habit({ startDay: '2026-10-19', target: 500 })];
-    const s = computeState({ habits: harder, logs, closedDays, today: '2026-10-20' });
-    expect(s.history[0].failed).toBe(false);
+    const s = computeState({ habits: harder, logs, closedDays, today: '2026-10-20', surprises: false });
+    expect(s.history[0].kind).toBe('cleared');
   });
 
   it('raises a stat by 1 per 5 completions of its habits', () => {

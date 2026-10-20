@@ -29,6 +29,8 @@ export function PenaltyModal({ failures }: { failures: DaySummary[] }) {
   const xpLost = failures.reduce((s, d) => s + d.xpLost, 0);
   const hpLost = failures.reduce((s, d) => s - d.hpChange, 0);
   const single = failures.length === 1;
+  // A lone first miss is a Slip: firm but forgiving. Any second-in-a-row miss is a Failure.
+  const slipOnly = failures.every((d) => d.kind === 'slip');
   const latest = failures[failures.length - 1];
 
   // The penalty quest can only be offered for the most recent failure, and only
@@ -58,10 +60,16 @@ export function PenaltyModal({ failures }: { failures: DaySummary[] }) {
     <Modal transparent animationType="fade" visible onRequestClose={takeFull} statusBarTranslucent>
       <View style={styles.backdrop}>
         <SystemWindow
-          variant="danger"
-          title="WARNING"
+          variant={slipOnly ? 'gold' : 'danger'}
+          title={slipOnly ? 'SLIP' : 'WARNING'}
           pulse
-          icon={<MaterialCommunityIcons name="alert-outline" size={18} color={colors.danger} />}>
+          icon={<MaterialCommunityIcons name="alert-outline" size={18} color={slipOnly ? colors.gold : colors.danger} />}>
+          {slipOnly ? (
+            <SysText style={[styles.lead, { color: '#ffe2a3' }]}>
+              One slip does not break a Player.{'\n'}
+              <SysText style={[styles.lead, { color: colors.gold, fontFamily: fonts.bodySemi }]}>Do not miss twice.</SysText>
+            </SysText>
+          ) : null}
           <SysText style={styles.lead}>
             {single ? 'You have failed to complete the ' : `You have failed ${failures.length} Daily Quests, including the `}
             <SysText style={[styles.lead, { color: colors.dangerSoft, fontFamily: fonts.bodySemi }]}>
@@ -74,7 +82,7 @@ export function PenaltyModal({ failures }: { failures: DaySummary[] }) {
             <SysText style={styles.blockTitle}>PENALTY APPLIED</SysText>
             <Line label="EXP" value={`−${xpLost}`} danger />
             <Line label="HP (streak health)" value={`−${hpLost}`} danger />
-            <Line label="Streak" value="Reset to 0" />
+            <Line label="Streak" value={slipOnly ? 'Kept: clear today to repair it' : 'Reset to 0'} />
           </View>
 
           <ScrollView style={{ maxHeight: 150 }} contentContainerStyle={styles.block}>
@@ -100,7 +108,11 @@ export function PenaltyModal({ failures }: { failures: DaySummary[] }) {
           ) : null}
 
           {quest ? <SysButton label="ACCEPT PENALTY QUEST" variant="danger" onPress={acceptQuest} /> : null}
-          <SysButton label={quest ? 'TAKE FULL PENALTY' : 'ACCEPT PENALTY'} variant={quest ? 'ghost' : 'danger'} onPress={takeFull} />
+          <SysButton
+            label={quest ? 'TAKE FULL PENALTY' : slipOnly ? 'UNDERSTOOD' : 'ACCEPT PENALTY'}
+            variant={quest ? 'ghost' : slipOnly ? 'gold' : 'danger'}
+            onPress={takeFull}
+          />
         </SystemWindow>
       </View>
     </Modal>

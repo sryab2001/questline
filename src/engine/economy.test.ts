@@ -10,6 +10,7 @@ import {
   MP_POTION_AMOUNT,
   POINTS_PER_DAILY_CLEAR,
   SKILLS,
+  SLIP_PENALTY_FACTOR,
   SURVIVAL_HOURS,
   SURVIVAL_PENALTY_FACTOR,
   SYSTEM_ITEMS,
@@ -35,7 +36,7 @@ const log = (habitId: string, day: string, amount: number): LogEntry => ({ habit
 
 function run(habits: Habit[], logs: LogEntry[], today: string, extra: Partial<EngineInput> = {}, survival: Record<string, 'cleared' | 'failed'> = {}) {
   const closedDays = daysToClose(habits, new Set(), today).map((d) => ({ ...evaluateDay(habits, logs, d), survival: survival[d] ?? null }));
-  return computeState({ habits, logs, closedDays, today, ...extra });
+  return computeState({ habits, logs, closedDays, today, surprises: false, ...extra });
 }
 
 describe('gold and ability points', () => {
@@ -63,23 +64,31 @@ describe('gold and ability points', () => {
 });
 
 describe('Streak Shield', () => {
-  it('absorbs a failed day: no penalty and the streak survives', () => {
-    const habits = [habit({ startDay: '2026-10-17' })];
-    // 17 clear, 18 fail (shield bought on the 17th), 19 clear
-    const logs = [log('pushups', '2026-10-17', 100), log('pushups', '2026-10-19', 100)];
-    const purchases = [{ day: '2026-10-17', kind: 'shield' as const, cost: SYSTEM_ITEMS.shield.cost }];
+  it('absorbs a Failure (second miss): no penalty and the streak survives', () => {
+    const habits = [habit({ startDay: '2026-10-16' })];
+    // 16 clear (shield bought), 17 slip, 18 failure → shielded, 19 clear
+    const logs = [log('pushups', '2026-10-16', 100), log('pushups', '2026-10-19', 100)];
+    const purchases = [{ day: '2026-10-16', kind: 'shield' as const, cost: SYSTEM_ITEMS.shield.cost }];
     const s = run(habits, logs, '2026-10-20', { purchases });
-    const failedDay = s.history.find((d) => d.day === '2026-10-18')!;
-    expect(failedDay).toMatchObject({ failed: true, shielded: true, xpLost: 0, hpChange: 0 });
+    expect(s.history.map((d) => d.kind)).toEqual(['cleared', 'slip', 'shielded', 'cleared']);
+    expect(s.history[2]).toMatchObject({ xpLost: 0, hpChange: 0 });
     expect(s.shields).toBe(0);
     expect(s.streak).toBe(2);
   });
 
-  it('only protects days after it was obtained', () => {
+  it('is not spent on a Slip', () => {
     const habits = [habit({ startDay: '2026-10-18' })];
+    const purchases = [{ day: '2026-10-18', kind: 'shield' as const, cost: 0 }];
+    const s = run(habits, [log('pushups', '2026-10-18', 100)], '2026-10-20', { purchases });
+    expect(s.history[1].kind).toBe('slip');
+    expect(s.shields).toBe(1);
+  });
+
+  it('only protects days after it was obtained', () => {
+    const habits = [habit({ startDay: '2026-10-17' })];
     const purchases = [{ day: '2026-10-19', kind: 'shield' as const, cost: 0 }];
     const s = run(habits, [log('pushups', '2026-10-19', 100)], '2026-10-20', { purchases });
-    expect(s.history[0]).toMatchObject({ day: '2026-10-18', failed: true, shielded: false });
+    expect(s.history.map((d) => d.kind)).toEqual(['slip', 'failure', 'cleared']);
     expect(s.shields).toBe(1);
   });
 });
@@ -89,7 +98,7 @@ describe('Rest Day and MP', () => {
     const habits = [habit({ startDay: '2026-10-18' })];
     const logs = [log('pushups', '2026-10-18', 100)];
     const s = run(habits, logs, '2026-10-20', { skillUses: [{ skill: 'rest_day', day: '2026-10-19' }] });
-    expect(s.history[1]).toMatchObject({ day: '2026-10-19', failed: true, rested: true, xpLost: 0, hpChange: 0 });
+    expect(s.history[1]).toMatchObject({ day: '2026-10-19', kind: 'rested', failed: true, rested: true, xpLost: 0, hpChange: 0 });
     expect(s.streak).toBe(1);
     // Full MP, then 1 goal on the 18th (capped), then the skill cost.
     expect(s.mp).toBe(MAX_MP - SKILLS.rest_day.mpCost);
@@ -131,7 +140,7 @@ describe('Survival penalty quest', () => {
     const halfLoss = halved.history.at(-1)!.xpLost;
     expect(levelFromTotalXp(full.totalXp + fullLoss).xpIntoLevel).toBeGreaterThanOrEqual(FAILED_DAY_PENALTY_XP);
     expect(halfLoss).toBe(Math.round(fullLoss / 2));
-    expect(halved.history.at(-1)!.hpChange).toBe(-Math.round(FAILED_DAY_HP_LOSS * SURVIVAL_PENALTY_FACTOR));
+    expect(halved.history.at(-1)!.hpChange).toBe(-Math.round(FAILED_DAY_HP_LOSS * SLIP_PENALTY_FACTOR * SURVIVAL_PENALTY_FACTOR));
   });
 
   it('requires clearing as many goals as were missed, within 4 hours or before reset', () => {

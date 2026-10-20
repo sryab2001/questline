@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -73,7 +74,7 @@ export default function SettingsScreen() {
           </View>
         </SystemWindow>
 
-        <SystemWindow title="SOUND">
+        <SystemWindow title="FEEDBACK">
           <View style={styles.tzRow}>
             <View style={{ flex: 1 }}>
               <SysText style={{ fontSize: 14, color: colors.text }}>Sound effects</SysText>
@@ -87,6 +88,20 @@ export default function SettingsScreen() {
               accessibilityLabel="Sound effects"
             />
           </View>
+          <View style={styles.tzRow}>
+            <View style={{ flex: 1 }}>
+              <SysText style={{ fontSize: 14, color: colors.text }}>Surprise rewards</SysText>
+              <SysText variant="caption">Random loot drops and Critical Clears</SysText>
+            </View>
+            <Switch
+              value={s.surprisesOn}
+              onValueChange={(v) => updateSettings({ surprisesOn: v })}
+              trackColor={{ true: colors.borderDone, false: colors.borderMuted }}
+              thumbColor={s.surprisesOn ? colors.cyan : colors.textMuted}
+              accessibilityLabel="Surprise rewards"
+            />
+          </View>
+          <SysButton label="HOW THE SYSTEM WORKS" variant="ghost" onPress={() => router.push('/guide')} />
         </SystemWindow>
 
         <SyncPanel />

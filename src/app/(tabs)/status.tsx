@@ -1,10 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProgressBar } from '@/components/progress-bar';
+import { HabitStrengthWindow, PassiveSkillsWindow, TitlePicker } from '@/components/strength-panel';
 import { SysButton } from '@/components/sys-button';
 import { SysText } from '@/components/sys-text';
 import { SystemWindow } from '@/components/system-window';
@@ -16,6 +18,7 @@ import { colors, fonts } from '@/theme';
 
 export default function StatusScreen() {
   const player = usePlayerState();
+  const [pickingTitle, setPickingTitle] = useState(false);
   if (!player) return null;
   const { state, settings } = player;
   const nextRank = RANKS[RANKS.indexOf(state.rank) + 1];
@@ -69,7 +72,9 @@ export default function StatusScreen() {
             <View style={styles.info}>
               <InfoRow label="NAME" value={settings.playerName} />
               <InfoRow label="JOB" value="None" />
-              <InfoRow label="TITLE" value="None" />
+              <Pressable onPress={() => setPickingTitle(true)} accessibilityRole="button" accessibilityLabel="Change title">
+                <InfoRow label="TITLE" value={settings.title || 'None ›'} gold={!!settings.title} />
+              </Pressable>
               <InfoRow label="RANK" value={state.rank} accent />
             </View>
           </View>
@@ -85,7 +90,10 @@ export default function StatusScreen() {
             <View key={stat} style={styles.statRow}>
               <SysText style={styles.statKey}>{stat}</SysText>
               <View style={{ flex: 1, gap: 2 }}>
-                <SysText variant="number">{state.stats[stat]}</SysText>
+                <SysText variant="number">
+                  {state.stats[stat]}
+                  {state.passiveBonus[stat] ? <SysText style={{ fontSize: 13, color: colors.epic }}> (+{state.passiveBonus[stat]})</SysText> : null}
+                </SysText>
                 <SysText variant="caption" style={{ fontSize: 11 }}>
                   {STAT_INFO[stat].source}
                 </SysText>
@@ -122,6 +130,9 @@ export default function StatusScreen() {
           ) : null}
         </SystemWindow>
 
+        <PassiveSkillsWindow player={player} />
+        <HabitStrengthWindow player={player} />
+
         <SystemWindow title="SKILLS" variant="epic">
           <View style={styles.skillRow}>
             <MaterialCommunityIcons name="weather-night" size={26} color={rest.unlocked ? colors.epic : colors.textDone} />
@@ -153,6 +164,7 @@ export default function StatusScreen() {
           </View>
         </SystemWindow>
       </ScrollView>
+      {pickingTitle ? <TitlePicker player={player} onClose={() => setPickingTitle(false)} /> : null}
     </SafeAreaView>
   );
 }
@@ -184,13 +196,15 @@ function Vital({ label, hint, value, max, color }: { label: string; hint: string
   );
 }
 
-function InfoRow({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function InfoRow({ label, value, accent, gold }: { label: string; value: string; accent?: boolean; gold?: boolean }) {
   return (
     <View style={styles.infoRow}>
       <SysText variant="caption" style={{ fontSize: 13 }}>
         {label}
       </SysText>
-      <SysText style={{ fontSize: 13, color: accent ? colors.cyan : colors.text }}>{value}</SysText>
+      <SysText style={{ fontSize: 13, color: gold ? colors.gold : accent ? colors.cyan : colors.text, flexShrink: 1, textAlign: 'right' }}>
+        {value}
+      </SysText>
     </View>
   );
 }

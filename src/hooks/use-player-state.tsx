@@ -4,8 +4,10 @@ import { AppState } from 'react-native';
 
 import {
   allocationsQuery,
+  checkinsQuery,
   closePendingDays,
   dayResultsQuery,
+  eventsQuery,
   habitsQuery,
   logsQuery,
   purchasesQuery,
@@ -24,6 +26,7 @@ import {
   type DayOutcome,
   type DaySummary,
   type Habit,
+  type OfferKind,
   parseSurvival,
   type PlayerState,
   type SurvivalQuest,
@@ -68,6 +71,8 @@ export interface PlayerData {
     lastSeenLevel: number;
     onboarded: boolean;
     soundOn: boolean;
+    surprisesOn: boolean;
+    title: string;
   };
   today: string;
   now: Date;
@@ -79,6 +84,8 @@ export interface PlayerData {
   activeSurvival: SurvivalEntry | null;
   /** A finished penalty quest whose result hasn't been shown yet. */
   survivalResult: SurvivalEntry | null;
+  /** Refs of one-time notices already shown ("season:2026-09", "report:2026-10-19", …). */
+  seen: Set<string>;
 }
 
 const PlayerContext = createContext<PlayerData | null>(null);
@@ -94,12 +101,14 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
   const { data: skillRows } = useLiveQuery(skillUsesQuery());
   const { data: allocationRows } = useLiveQuery(allocationsQuery());
   const { data: storeRows } = useLiveQuery(storeItemsQuery());
+  const { data: checkinRows } = useLiveQuery(checkinsQuery());
+  const { data: eventRows } = useLiveQuery(eventsQuery());
   const now = useNow();
 
   // Changes identity whenever any synced table changes (not on the minute tick).
   const dataVersion = useMemo(
-    () => [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows],
-    [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows],
+    () => [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows],
+    [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows],
   );
 
   const player = useMemo((): PlayerData | null => {
@@ -124,6 +133,11 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
       purchases: parsedPurchases.map((p) => ({ day: p.day, kind: p.kind, cost: p.cost, result: p.result })),
       skillUses: skillRows.map((u) => ({ skill: u.skill, day: u.day })),
       allocations: allocationRows.map((a) => ({ stat: a.stat, points: a.points })),
+      checkins: checkinRows.map((c) => ({ habitId: c.habitId, day: c.day, avg: c.avg })),
+      decisions: eventRows
+        .filter((e) => e.kind === 'offer' && e.dataJson)
+        .map((e) => ({ habitId: e.ref, kind: (JSON.parse(e.dataJson!) as { kind: OfferKind }).kind, day: e.day })),
+      surprises: s.surprisesOn,
     });
 
     const storeItems = storeRows.map((r) => ({ id: r.id, name: r.name, cost: r.cost }));
@@ -158,16 +172,19 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
         lastSeenLevel: s.lastSeenLevel,
         onboarded: s.onboarded,
         soundOn: s.soundOn,
+        surprisesOn: s.surprisesOn,
+        title: s.title,
       },
       today,
       now,
-      unseenFailures: state.history.filter((d) => d.failed && !d.shielded && !d.rested && unseen.has(d.day)),
+      unseenFailures: state.history.filter((d) => (d.kind === 'slip' || d.kind === 'failure') && unseen.has(d.day)),
       storeItems,
       purchases,
       activeSurvival: activeSurvival ?? null,
       survivalResult: survivalResult ?? null,
+      seen: new Set(eventRows.filter((e) => e.kind === 'seen').map((e) => e.ref)),
     };
-  }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, now]);
+  }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, now]);
 
   return { player, dataVersion };
 }
@@ -218,14 +235,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => setSoundEnabled(soundOn), [soundOn]);
 
   // Keep scheduled reminders in step with today's progress and settings.
+  // Passive Skills no longer need reminders: they don't count toward the warning.
+  const remindable = player?.state.today.goals.filter((g) => !g.mastered || g.weakened) ?? [];
   const plan = player && {
     morningHour: player.settings.morningHour,
     warningHour: player.settings.warningHour,
-    todayTotal: player.state.today.total,
-    todayCleared: player.state.today.cleared,
+    todayTotal: remindable.length,
+    todayCleared: remindable.filter((g) => g.done || g.min).length,
     hasHabits: player.habits.length > 0,
     restedToday: player.state.today.rested,
     survivalDeadline: player.activeSurvival?.quest.deadline ?? null,
+    streakAtRisk: player.state.streakAtRisk,
+    cues: remindable
+      .filter((g) => !g.done)
+      .map((g) => {
+        const cue = player.habits.find((h) => h.id === g.habitId)?.cue;
+        return cue ? `After ${cue} → ${g.name}` : g.name;
+      }),
   };
   const planKey = plan ? `${today}|${JSON.stringify(plan)}` : null;
   useEffect(() => {

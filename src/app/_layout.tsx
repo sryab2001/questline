@@ -60,6 +60,7 @@ export default function RootLayout() {
         <Stack.Screen name="habits" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="history" />
+        <Stack.Screen name="guide" />
         <Stack.Screen name="awakening" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
     </PlayerProvider>

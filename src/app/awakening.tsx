@@ -17,17 +17,17 @@ import { setupNotifications } from '@/notifications';
 import { playSound } from '@/sound';
 import { colors, fonts } from '@/theme';
 
-const STARTERS: HabitInput[] = [
-  { name: 'Push-ups', stat: 'STR', target: 50, unit: 'reps', grade: 'E', schedule: 'daily' },
-  { name: 'Squats', stat: 'STR', target: 50, unit: 'reps', grade: 'E', schedule: 'daily' },
-  { name: 'Run', stat: 'AGI', target: 3, unit: 'km', grade: 'D', schedule: 'daily' },
-  { name: 'Walk', stat: 'AGI', target: 8000, unit: 'steps', grade: 'E', schedule: 'daily' },
-  { name: 'Drink water', stat: 'STA', target: 2, unit: 'L', grade: 'F', schedule: 'daily' },
-  { name: 'Sleep before 23:00', stat: 'STA', target: 1, unit: '', grade: 'E', schedule: 'daily' },
-  { name: 'Read', stat: 'INT', target: 10, unit: 'pages', grade: 'E', schedule: 'daily' },
-  { name: 'Study', stat: 'INT', target: 30, unit: 'min', grade: 'D', schedule: 'daily' },
-  { name: 'Meditate', stat: 'SENSE', target: 5, unit: 'min', grade: 'E', schedule: 'daily' },
-  { name: 'Journal', stat: 'SENSE', target: 1, unit: '', grade: 'F', schedule: 'daily' },
+const STARTERS: (HabitInput & { suggestCue: string })[] = [
+  { name: 'Push-ups', stat: 'STR', target: 50, unit: 'reps', grade: 'E', schedule: 'daily', minTarget: 10, suggestCue: 'get out of bed' },
+  { name: 'Squats', stat: 'STR', target: 50, unit: 'reps', grade: 'E', schedule: 'daily', minTarget: 10, suggestCue: 'start the kettle' },
+  { name: 'Run', stat: 'AGI', target: 3, unit: 'km', grade: 'D', schedule: 'daily', minTarget: 1, suggestCue: 'get home from work' },
+  { name: 'Walk', stat: 'AGI', target: 8000, unit: 'steps', grade: 'E', schedule: 'daily', minTarget: 3000, suggestCue: 'finish lunch' },
+  { name: 'Drink water', stat: 'STA', target: 2, unit: 'L', grade: 'F', schedule: 'daily', minTarget: 1, suggestCue: 'sit down at my desk' },
+  { name: 'Sleep before 23:00', stat: 'STA', target: 1, unit: '', grade: 'E', schedule: 'daily', suggestCue: 'plug in my phone for the night' },
+  { name: 'Read', stat: 'INT', target: 10, unit: 'pages', grade: 'E', schedule: 'daily', minTarget: 2, suggestCue: 'get into bed' },
+  { name: 'Study', stat: 'INT', target: 30, unit: 'min', grade: 'D', schedule: 'daily', minTarget: 10, suggestCue: 'finish dinner' },
+  { name: 'Meditate', stat: 'SENSE', target: 5, unit: 'min', grade: 'E', schedule: 'daily', minTarget: 2, suggestCue: 'pour my morning coffee' },
+  { name: 'Journal', stat: 'SENSE', target: 1, unit: '', grade: 'F', schedule: 'daily', suggestCue: 'brush my teeth at night' },
 ];
 
 const DEFAULT_PICKS = new Set(['Push-ups', 'Run', 'Read']);
@@ -37,6 +37,7 @@ export default function Awakening() {
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [picked, setPicked] = useState<Set<string>>(DEFAULT_PICKS);
+  const [cues, setCues] = useState<Record<string, string>>({});
   const [resetHour, setResetHour] = useState(0);
   const [morningHour, setMorningHour] = useState(7);
   const [warningHour, setWarningHour] = useState(21);
@@ -63,7 +64,9 @@ export default function Awakening() {
 
   const begin = async () => {
     setFinishing(true);
-    await addHabits(STARTERS.filter((h) => picked.has(h.name)));
+    await addHabits(
+      STARTERS.filter((h) => picked.has(h.name)).map(({ suggestCue: _s, ...h }) => ({ ...h, cue: (cues[h.name] ?? '').trim() })),
+    );
     await updateSettings({ playerName: name.trim() || 'Hunter', resetHour, morningHour, warningHour, onboarded: true });
     await setupNotifications().catch(() => false);
     playSound('quest');
@@ -74,8 +77,8 @@ export default function Awakening() {
     <SafeAreaView style={styles.screen}>
       <KeyboardAvoidingView behavior="height" style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.dots} accessibilityLabel={`Step ${step + 1} of 5`}>
-            {[0, 1, 2, 3, 4].map((i) => (
+          <View style={styles.dots} accessibilityLabel={`Step ${step + 1} of 6`}>
+            {[0, 1, 2, 3, 4, 5].map((i) => (
               <View key={i} style={[styles.dot, i <= step && { backgroundColor: colors.cyan, borderColor: colors.cyan }]} />
             ))}
           </View>
@@ -155,6 +158,36 @@ export default function Awakening() {
 
             {step === 3 ? (
               <>
+                <SystemWindow title="TRIGGERS">
+                  <SysText style={styles.center}>
+                    Habits are started by cues, not willpower. Tie each quest to something you already do every day.
+                  </SysText>
+                  {STARTERS.filter((h) => picked.has(h.name)).map((h) => (
+                    <View key={h.name} style={{ gap: 6 }}>
+                      <SysText variant="label" style={{ fontSize: 13 }}>
+                        {h.name.toUpperCase()}
+                      </SysText>
+                      <View style={styles.cueRow}>
+                        <SysText style={{ color: colors.cyan, fontFamily: fonts.bodyMedium }}>After I</SysText>
+                        <TextInput
+                          value={cues[h.name] ?? ''}
+                          onChangeText={(t) => setCues((c) => ({ ...c, [h.name]: t }))}
+                          placeholder={h.suggestCue}
+                          placeholderTextColor={colors.textDone}
+                          style={[styles.cueInput]}
+                          accessibilityLabel={`Trigger for ${h.name}`}
+                        />
+                      </View>
+                    </View>
+                  ))}
+                  {picked.size === 0 ? <SysText variant="caption">No quests picked. You can add triggers later.</SysText> : null}
+                </SystemWindow>
+                <SysButton label="CONFIRM" onPress={next} />
+              </>
+            ) : null}
+
+            {step === 4 ? (
+              <>
                 <SystemWindow title="SYSTEM TIME">
                   <HourStepper label="Daily reset" hint="When a new Daily Quest begins" value={resetHour} onChange={setResetHour} />
                   <HourStepper label="Quest arrival" hint="Morning notification" value={morningHour} onChange={setMorningHour} />
@@ -165,7 +198,7 @@ export default function Awakening() {
               </>
             ) : null}
 
-            {step === 4 ? (
+            {step === 5 ? (
               <>
                 <SystemWindow title="QUEST INFO" pulse>
                   <SysText style={styles.big}>
@@ -181,7 +214,7 @@ export default function Awakening() {
             ) : null}
           </Animated.View>
 
-          {step > 0 && step < 4 ? (
+          {step > 0 && step < 5 ? (
             <Pressable onPress={() => setStep((s) => s - 1)} style={styles.link} accessibilityRole="button">
               <SysText variant="caption">Back</SysText>
             </Pressable>
@@ -224,4 +257,16 @@ const styles = StyleSheet.create({
   },
   box: { width: 22, height: 22, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   stat: { fontFamily: fonts.display, fontSize: 13, letterSpacing: 1, color: colors.cyan },
+  cueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cueInput: {
+    flex: 1,
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
+    backgroundColor: colors.panelRow,
+    color: colors.text,
+    paddingHorizontal: 12,
+    fontFamily: fonts.body,
+    fontSize: 15,
+  },
 });

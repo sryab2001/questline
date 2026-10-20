@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { GOAL_XP, GOLD_PER_GOAL, type GoalProgress, type Grade } from '@/engine';
+import { type Drop, GOAL_XP, GOLD_PER_GOAL, type Grade, MASTERED_XP_FACTOR, type PlayerState } from '@/engine';
 import { playSound } from '@/sound';
 
 export interface ClearEvent {
@@ -8,32 +8,42 @@ export interface ClearEvent {
   name: string;
   xp: number;
   gold: number;
+  critical: boolean;
+  /** Surprise drops revealed by this clear (the quest's own, plus the daily-clear roll). */
+  drops: Drop[];
   /** This clear completed the whole Daily Quest. */
   questComplete: boolean;
+  comeback: boolean;
 }
 
 /**
  * Watches today's goals and reports the moment one becomes done (with its rewards),
  * playing the System chime. The first render only records the baseline.
  */
-export function useClearEvents(goals: GoalProgress[], grades: Map<string, Grade>, today: string): ClearEvent | null {
-  const prev = useRef<{ today: string; done: Set<string> } | null>(null);
+export function useClearEvents(today: PlayerState['today'] | undefined, grades: Map<string, Grade>, dayKey: string): ClearEvent | null {
+  const prev = useRef<{ day: string; done: Set<string> } | null>(null);
   const [event, setEvent] = useState<ClearEvent | null>(null);
 
   useEffect(() => {
-    const done = new Set(goals.filter((g) => g.done).map((g) => g.habitId));
+    if (!today) return;
+    const done = new Set(today.goals.filter((g) => g.done).map((g) => g.habitId));
     const before = prev.current;
-    prev.current = { today, done };
-    if (!before || before.today !== today) return;
+    prev.current = { day: dayKey, done };
+    if (!before || before.day !== dayKey) return;
 
-    const newly = goals.filter((g) => g.done && !before.done.has(g.habitId));
+    const newly = today.goals.filter((g) => g.done && !before.done.has(g.habitId));
     if (newly.length === 0) return;
 
-    const questComplete = goals.length > 0 && done.size === goals.length;
-    playSound(questComplete ? 'quest' : 'clear');
     const g = newly[newly.length - 1];
-    setEvent({ key: Date.now(), name: g.name, xp: GOAL_XP[grades.get(g.habitId) ?? 'E'], gold: GOLD_PER_GOAL, questComplete });
-  }, [goals, grades, today]);
+    const questComplete = today.allCleared;
+    const critical = today.criticals.includes(g.name);
+    const drops = today.drops.filter((d) => d.source === g.habitId || (questComplete && d.source === 'clear'));
+    const xp = Math.round(GOAL_XP[grades.get(g.habitId) ?? 'E'] * (g.mastered && !g.weakened ? MASTERED_XP_FACTOR : 1) * (critical ? 2 : 1));
+
+    playSound(questComplete ? 'quest' : 'clear');
+    if (drops.length) setTimeout(() => playSound('purchase'), 450);
+    setEvent({ key: Date.now(), name: g.name, xp, gold: GOLD_PER_GOAL, critical, drops, questComplete, comeback: today.comeback });
+  }, [today, grades, dayKey]);
 
   return event;
 }

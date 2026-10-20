@@ -7,7 +7,10 @@ import {
   daysToClose,
   evaluateDay,
   type Grade,
+  GRADES,
   type Habit,
+  type OfferKind,
+  type QuestOffer,
   rollBlessedBox,
   rollCursedBox,
   type SkillId,
@@ -19,7 +22,18 @@ import {
 import { uuidv7 } from '@/lib/uuid';
 
 import { db } from './client';
-import { dayResults, habits, logs, purchases, settings, skillUses, statAllocations, storeItems } from './schema';
+import {
+  checkins,
+  dayResults,
+  events,
+  habits,
+  logs,
+  purchases,
+  settings,
+  skillUses,
+  statAllocations,
+  storeItems,
+} from './schema';
 
 const SETTINGS_ID = 'settings';
 
@@ -67,7 +81,16 @@ export async function getSettings() {
 export type SettingsPatch = Partial<
   Pick<
     typeof settings.$inferInsert,
-    'playerName' | 'resetHour' | 'morningHour' | 'warningHour' | 'lastSeenLevel' | 'timeZone' | 'onboarded' | 'soundOn'
+    | 'playerName'
+    | 'resetHour'
+    | 'morningHour'
+    | 'warningHour'
+    | 'lastSeenLevel'
+    | 'timeZone'
+    | 'onboarded'
+    | 'soundOn'
+    | 'surprisesOn'
+    | 'title'
   >
 >;
 
@@ -95,6 +118,13 @@ export function toEngineHabit(h: HabitRow): Habit {
     grade: h.grade,
     startDay: h.startDay,
     archived: h.archived,
+    minTarget: h.minTarget,
+    mastered: h.masteredAt !== null,
+    cue: h.cue,
+    place: h.place,
+    bundle: h.bundle,
+    masteryName: h.masteryName,
+    masteryTitle: h.masteryTitle,
   };
 }
 
@@ -105,6 +135,10 @@ export interface HabitInput {
   unit: string;
   grade: Grade;
   schedule: string;
+  cue?: string;
+  place?: string;
+  bundle?: string;
+  minTarget?: number | null;
 }
 
 export async function addHabits(list: HabitInput[]) {
@@ -172,6 +206,7 @@ export function closePendingDays(): Promise<number> {
       for (const day of pending) {
         const outcome = evaluateDay(engineHabits, logRows, day);
         const cleared = outcome.goals.filter((g) => g.done).length;
+        const kept = outcome.goals.every((g) => g.done || g.min);
         const total = outcome.goals.length;
         await db
           .insert(dayResults)
@@ -183,7 +218,7 @@ export function closePendingDays(): Promise<number> {
             total,
             outcomesJson: JSON.stringify(outcome.goals),
             // Only failures need the player's attention.
-            acknowledged: total === 0 || cleared === total,
+            acknowledged: total === 0 || kept,
           })
           .onConflictDoNothing();
       }
@@ -283,6 +318,56 @@ export async function setSurvival(day: string, quest: SurvivalQuest) {
     .where(eq(dayResults.day, day));
 }
 
+// ---------- behaviour design ----------
+
+async function addEvent(kind: string, ref: string, data?: unknown) {
+  await db.insert(events).values({
+    id: uuidv7(),
+    ...stamps(),
+    kind,
+    ref,
+    day: await todayKey(),
+    dataJson: data === undefined ? null : JSON.stringify(data),
+  });
+}
+
+/** Marks a one-time notice (season recap, daily report, re-plan) as seen. */
+export function markSeen(ref: string) {
+  return addEvent('seen', ref);
+}
+
+/** Records the answer to an upgrade/downgrade/mastery offer so it isn't repeated too soon. */
+export function recordDecision(habitId: string, kind: OfferKind, accepted: boolean) {
+  return addEvent('offer', habitId, { kind, accepted });
+}
+
+export async function submitCheckin(habitId: string, scores: number[]) {
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  await db.insert(checkins).values({ id: uuidv7(), ...stamps(), habitId, day: await todayKey(), scoresJson: JSON.stringify(scores), avg });
+}
+
+/** Turns a quest into a Passive Skill. */
+export async function acceptMastery(habitId: string, skillName: string, identityTitle: string) {
+  await db
+    .update(habits)
+    .set({ masteredAt: new Date(), masteryName: skillName.trim(), masteryTitle: identityTitle.trim(), ...touched() })
+    .where(eq(habits.id, habitId));
+  await recordDecision(habitId, 'mastery', true);
+}
+
+export async function acceptOffer(offer: QuestOffer) {
+  await updateHabit(offer.habitId, {
+    target: offer.toTarget,
+    ...(offer.suggestMin ? { minTarget: offer.suggestMin } : {}),
+  });
+  if (offer.kind === 'up') {
+    const h = await getHabit(offer.habitId);
+    const next = h ? GRADES[Math.min(GRADES.length - 1, GRADES.indexOf(h.grade) + 1)] : undefined;
+    if (next) await updateHabit(offer.habitId, { grade: next });
+  }
+  await recordDecision(offer.habitId, offer.kind, true);
+}
+
 // ---------- dev tools ----------
 
 /**
@@ -330,6 +415,14 @@ export function skillUsesQuery() {
 
 export function allocationsQuery() {
   return db.select().from(statAllocations).where(isNull(statAllocations.deletedAt));
+}
+
+export function checkinsQuery() {
+  return db.select().from(checkins).where(isNull(checkins.deletedAt));
+}
+
+export function eventsQuery() {
+  return db.select().from(events).where(isNull(events.deletedAt));
 }
 
 export function dayResultsQuery() {
