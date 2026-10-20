@@ -45,3 +45,6 @@ example
 # PocketBase server (binary and data stay local)
 server/bin/
 server/pb_data/
+
+# Build output
+dist/
