@@ -7,7 +7,7 @@ A habit tracker for Android, styled as the "System" from *Solo Leveling* with it
 
 ## Stack
 
-Expo (React Native + TypeScript), expo-router, expo-sqlite + Drizzle ORM (local-first), Reanimated. Sync to a PocketBase server comes in Phase 2.
+Expo SDK 57 (React Native + TypeScript), expo-router, expo-sqlite + Drizzle ORM (local-first), Reanimated, expo-audio. Syncs to a self-hosted PocketBase server (see [server/README.md](server/README.md) for the PC/Tailscale setup and [server/deploy/README.md](server/deploy/README.md) for a Linux VM).
 
 ## Run it on your phone
 
@@ -24,13 +24,20 @@ Expo (React Native + TypeScript), expo-router, expo-sqlite + Drizzle ORM (local-
 | `npm run typecheck` | TypeScript check |
 | `npm run lint` | ESLint |
 | `npm run db:generate` | Generate a Drizzle migration after editing `src/db/schema.ts` |
+| `node scripts/generate-icons.mjs` | Re-render the app icon, adaptive icon, splash and notification icon |
+| `node scripts/generate-sounds.mjs` | Re-synthesize the sound effects in `assets/sounds/` |
+| `powershell -File server/package.ps1` | Build `dist/questline-server.tar.gz` for a Linux server |
 
 ## Layout
 
 ```
 src/
-  app/          expo-router screens: (tabs)/index (Quests), status, store, class
-  engine/       pure game logic: days, levels, ranks, state (no React, no DB) + tests
+  app/          expo-router screens: (tabs)/ Quests, Status, Store, Class; awakening (onboarding),
+                habit editor, habits, history (calendar), settings
+  engine/       pure game logic: days, levels, ranks, economy, survival, boxes (no React, no DB) + tests
+  sync/         PocketBase client, table mapping, push/pull engine, status store
+  sound/        sound effect playback
+  notifications/ scheduled System reminders
   db/           Drizzle schema, client, actions
   hooks/        usePlayerState: live DB queries → engine → screen state
   components/   SystemWindow, QuestRow, ProgressBar, SysText

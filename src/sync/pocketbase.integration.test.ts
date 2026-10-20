@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { PbClient, PbError } from './client';
 import { SYNC_TABLES, toLocal, toRemote } from './tables';
 
-const { PB_TEST_URL, PB_TEST_EMAIL, PB_TEST_PASSWORD } = process.env;
+const PB_TEST_URL = process.env.PB_TEST_URL;
+const PB_TEST_EMAIL = process.env.PB_TEST_EMAIL;
+const PB_TEST_PASSWORD = process.env.PB_TEST_PASSWORD;
 const run = PB_TEST_URL && PB_TEST_EMAIL && PB_TEST_PASSWORD ? describe : describe.skip;
 
 const habits = SYNC_TABLES.find((t) => t.name === 'habits')!;

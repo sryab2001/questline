@@ -72,7 +72,7 @@ describe('computeState', () => {
     const s = computeState({ habits: [], logs: [], closedDays: [], today: '2026-10-20' });
     expect(s).toMatchObject({ totalXp: 0, level: 1, rank: 'E', streak: 0, hp: MAX_HP, history: [] });
     expect(s.stats.STR).toBe(BASE_STAT);
-    expect(s.today).toEqual({ goals: [], cleared: 0, total: 0, allCleared: false });
+    expect(s.today).toEqual({ goals: [], cleared: 0, total: 0, allCleared: false, rested: false });
   });
 
   it("counts today's EXP provisionally, with the clear bonus once every goal is done", () => {

@@ -2,6 +2,8 @@
 
 How we turn the design ([game-design.md](game-design.md)) and the screen mockups into a real Android app.
 
+**Status (2026-10-20):** Phases 0–3 done. Server packaged for a Linux VM (Oracle ARM) in `server/deploy/`.
+
 **Decisions so far**
 - Name: **Questline**
 - Platform: **Android only**, a native app (no web or laptop version)
@@ -128,7 +130,9 @@ Quest APP/
 - Login, sync engine (push/pull), "Sync now" button and status indicator.
 - Restore onto a fresh install to prove the backup works.
 
-### Phase 3: System economy (3–4 days)
+### Phase 3: System economy (3–4 days) ✅
+Also shipped in this round: app icon and splash, Awakening onboarding, history calendar, sounds and richer animations.
+
 - Ability points (+3 per daily clear) and allocation.
 - HP (streak health), MP, Fatigue; skill **Rest Day** (costs MP).
 - Gold + **Store**: custom treats, Streak Shield, Blessed/Cursed Random Box.

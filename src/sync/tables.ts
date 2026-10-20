@@ -35,6 +35,7 @@ export const SYNC_TABLES: SyncTable[] = [
   table('stat_allocations', schema.statAllocations),
   table('store_items', schema.storeItems),
   table('purchases', schema.purchases),
+  table('skill_uses', schema.skillUses),
   table('unlocks', schema.unlocks),
   table('class_quests', schema.classQuests),
 ];

@@ -4,6 +4,8 @@ import { Modal, StyleSheet, View } from 'react-native';
 import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { updateSettings } from '@/db/actions';
+import { SKILLS } from '@/engine';
+import { playSound } from '@/sound';
 import { colors, fonts } from '@/theme';
 
 import { SysButton } from './sys-button';
@@ -20,12 +22,14 @@ export function LevelUpModal({ from, to, onOpenStatus }: Props) {
   const pulse = useSharedValue(0.6);
 
   useEffect(() => {
+    playSound('levelup');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     pulse.value = withRepeat(withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.sin) }), -1, true);
   }, [pulse]);
 
   const glow = useAnimatedStyle(() => ({ opacity: pulse.value, transform: [{ scale: 0.98 + pulse.value * 0.02 }] }));
   const gained = to - from;
+  const newSkills = Object.values(SKILLS).filter((sk) => sk.unlockLevel > from && sk.unlockLevel <= to);
   const dismiss = () => updateSettings({ lastSeenLevel: to });
 
   return (
@@ -58,6 +62,9 @@ export function LevelUpModal({ from, to, onOpenStatus }: Props) {
             <View style={styles.rewards}>
               <Reward label="All stats" value={`+${gained} each`} />
               <Reward label="Rank progress" value={`Lv. ${to}`} />
+              {newSkills.map((sk) => (
+                <Reward key={sk.name} label="New skill" value={`${sk.name} (${sk.mpCost} MP)`} />
+              ))}
             </View>
           </SystemWindow>
         </Animated.View>

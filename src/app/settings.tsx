@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { HourStepper } from '@/components/hour-stepper';
 import { ScreenHeader } from '@/components/screen-header';
 import { SysButton } from '@/components/sys-button';
 import { SyncPanel } from '@/components/sync-panel';
@@ -11,8 +12,6 @@ import { devSimulateMissedDay, deviceTimeZone, updateSettings } from '@/db/actio
 import { usePlayerState } from '@/hooks/use-player-state';
 import { notificationPermission, setupNotifications } from '@/notifications';
 import { colors, fonts } from '@/theme';
-
-const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
 export default function SettingsScreen() {
   const player = usePlayerState();
@@ -74,6 +73,22 @@ export default function SettingsScreen() {
           </View>
         </SystemWindow>
 
+        <SystemWindow title="SOUND">
+          <View style={styles.tzRow}>
+            <View style={{ flex: 1 }}>
+              <SysText style={{ fontSize: 14, color: colors.text }}>Sound effects</SysText>
+              <SysText variant="caption">System chimes, level-up and penalty alarms</SysText>
+            </View>
+            <Switch
+              value={s.soundOn}
+              onValueChange={(v) => updateSettings({ soundOn: v })}
+              trackColor={{ true: colors.borderDone, false: colors.borderMuted }}
+              thumbColor={s.soundOn ? colors.cyan : colors.textMuted}
+              accessibilityLabel="Sound effects"
+            />
+          </View>
+        </SystemWindow>
+
         <SyncPanel />
 
         <SystemWindow title="NOTIFICATIONS">
@@ -103,25 +118,6 @@ export default function SettingsScreen() {
   );
 }
 
-function HourStepper({ label, hint, value, onChange }: { label: string; hint: string; value: number; onChange: (v: number) => void }) {
-  const step = (d: number) => onChange((value + d + 24) % 24);
-  return (
-    <View style={styles.stepRow}>
-      <View style={{ flex: 1 }}>
-        <SysText style={{ fontSize: 14, color: colors.text }}>{label}</SysText>
-        <SysText variant="caption">{hint}</SysText>
-      </View>
-      <Pressable style={styles.stepBtn} onPress={() => step(-1)} accessibilityLabel={`${label} earlier`}>
-        <SysText style={styles.stepBtnText}>−</SysText>
-      </Pressable>
-      <SysText style={styles.hour}>{hh(value)}</SysText>
-      <Pressable style={styles.stepBtn} onPress={() => step(1)} accessibilityLabel={`${label} later`}>
-        <SysText style={styles.stepBtnText}>+</SysText>
-      </Pressable>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: 20, paddingBottom: 32, gap: 22 },
@@ -135,9 +131,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 15,
   },
-  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  stepBtn: { width: 44, height: 44, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  stepBtnText: { fontFamily: fonts.display, fontSize: 22, color: colors.cyan },
-  hour: { fontFamily: fonts.display, fontSize: 20, minWidth: 62, textAlign: 'center', fontVariant: ['tabular-nums'] },
   tzRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });

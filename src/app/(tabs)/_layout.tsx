@@ -1,9 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import type { ComponentProps } from 'react';
 import type { ColorValue } from 'react-native';
 
 import { SystemNotices } from '@/components/system-notices';
+import { usePlayerState } from '@/hooks/use-player-state';
+import { useSyncStatus } from '@/sync/status';
 import { colors, fonts } from '@/theme';
 
 type IconProps = ComponentProps<typeof MaterialCommunityIcons>;
@@ -13,6 +16,13 @@ function TabIcon({ name, color, size }: { name: IconProps['name']; color: ColorV
 }
 
 export default function TabsLayout() {
+  const player = usePlayerState();
+  const syncing = useSyncStatus().state === 'syncing';
+  // New players start with the Awakening; wait out a restore in progress first.
+  if (player && !player.settings.onboarded && player.habits.length === 0 && !syncing) {
+    return <Redirect href="/awakening" />;
+  }
+
   return (
     <>
       <SystemNotices />

@@ -24,6 +24,9 @@ export const settings = sqliteTable('settings', {
   morningHour: integer('morning_hour').notNull().default(7),
   /** Local hour for the "penalty incoming" warning. */
   warningHour: integer('warning_hour').notNull().default(21),
+  /** Finished the first-run Awakening flow. */
+  onboarded: integer('onboarded', { mode: 'boolean' }).notNull().default(false),
+  soundOn: integer('sound_on', { mode: 'boolean' }).notNull().default(true),
 });
 
 export const habits = sqliteTable('habits', {
@@ -82,8 +85,20 @@ export const storeItems = sqliteTable('store_items', {
 
 export const purchases = sqliteTable('purchases', {
   ...syncColumns,
+  /** The user's store_items row for treats; empty for System items. */
   storeItemId: text('store_item_id').notNull(),
   cost: integer('cost').notNull(),
+  kind: text('kind', { enum: ['treat', 'shield', 'blessed_box', 'cursed_box'] }).notNull().default('treat'),
+  /** Game day of the purchase. */
+  day: text('day').notNull().default(''),
+  /** What a random box contained (engine BoxResult as JSON). */
+  resultJson: text('result_json'),
+});
+
+export const skillUses = sqliteTable('skill_uses', {
+  ...syncColumns,
+  skill: text('skill', { enum: ['rest_day'] }).notNull(),
+  day: text('day').notNull(),
 });
 
 export const unlocks = sqliteTable('unlocks', {

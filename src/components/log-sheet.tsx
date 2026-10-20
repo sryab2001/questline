@@ -4,6 +4,7 @@ import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { logProgress } from '@/db/actions';
 import type { GoalProgress } from '@/engine';
+import { playSound } from '@/sound';
 import { colors, fonts } from '@/theme';
 
 import { ProgressBar } from './progress-bar';
@@ -39,6 +40,8 @@ export function LogSheet({ goal, onClose }: Props) {
     if (delta === 0) return;
     await logProgress(goal.habitId, delta);
     const justDone = goal.progress < goal.target && next >= goal.target;
+    // The clear chime comes from the Quests screen; partial logs just tick.
+    if (!justDone) playSound('tick');
     (justDone
       ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)

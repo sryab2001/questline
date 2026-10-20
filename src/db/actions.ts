@@ -1,10 +1,25 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 
-import { addDays, dayKey, daysToClose, evaluateDay, type Grade, type Habit, type Stat } from '@/engine';
+import {
+  addDays,
+  type BoxResult,
+  dayKey,
+  daysToClose,
+  evaluateDay,
+  type Grade,
+  type Habit,
+  rollBlessedBox,
+  rollCursedBox,
+  type SkillId,
+  type Stat,
+  type SurvivalQuest,
+  SYSTEM_ITEMS,
+  type SystemItemId,
+} from '@/engine';
 import { uuidv7 } from '@/lib/uuid';
 
 import { db } from './client';
-import { dayResults, habits, logs, settings } from './schema';
+import { dayResults, habits, logs, purchases, settings, skillUses, statAllocations, storeItems } from './schema';
 
 const SETTINGS_ID = 'settings';
 
@@ -50,7 +65,10 @@ export async function getSettings() {
 }
 
 export type SettingsPatch = Partial<
-  Pick<typeof settings.$inferInsert, 'playerName' | 'resetHour' | 'morningHour' | 'warningHour' | 'lastSeenLevel' | 'timeZone'>
+  Pick<
+    typeof settings.$inferInsert,
+    'playerName' | 'resetHour' | 'morningHour' | 'warningHour' | 'lastSeenLevel' | 'timeZone' | 'onboarded' | 'soundOn'
+  >
 >;
 
 export async function updateSettings(patch: SettingsPatch) {
@@ -182,6 +200,89 @@ export async function acknowledgeDays(days: string[]) {
   await db.update(dayResults).set({ acknowledged: true, ...touched() }).where(inArray(dayResults.day, days));
 }
 
+// ---------- store ----------
+
+export async function addStoreItem(name: string, cost: number) {
+  await db.insert(storeItems).values({ id: uuidv7(), ...stamps(), name: name.trim(), cost: Math.round(cost), kind: 'treat' });
+}
+
+export async function updateStoreItem(id: string, name: string, cost: number) {
+  await db
+    .update(storeItems)
+    .set({ name: name.trim(), cost: Math.round(cost), ...touched() })
+    .where(eq(storeItems.id, id));
+}
+
+export async function deleteStoreItem(id: string) {
+  await db.update(storeItems).set({ deletedAt: new Date(), ...touched() }).where(eq(storeItems.id, id));
+}
+
+/**
+ * Records a purchase. The caller checks the gold balance first; random boxes
+ * are rolled here, once, and the result is stored so it never changes.
+ */
+export async function buy(
+  item: { kind: 'treat'; storeItemId: string; cost: number } | { kind: SystemItemId },
+): Promise<BoxResult | null> {
+  const day = await todayKey();
+  let result: BoxResult | null = null;
+  let cost: number;
+  let storeItemId = '';
+
+  if (item.kind === 'treat') {
+    cost = item.cost;
+    storeItemId = item.storeItemId;
+  } else {
+    cost = SYSTEM_ITEMS[item.kind].cost;
+    if (item.kind === 'blessed_box') {
+      const treats = await db.select({ name: storeItems.name }).from(storeItems).where(isNull(storeItems.deletedAt));
+      result = rollBlessedBox(treats.map((t) => t.name));
+      if (!result) throw new Error('Add a reward to your list first.');
+    } else if (item.kind === 'cursed_box') {
+      result = rollCursedBox();
+    }
+  }
+
+  await db.insert(purchases).values({
+    id: uuidv7(),
+    ...stamps(),
+    storeItemId,
+    cost,
+    kind: item.kind,
+    day,
+    resultJson: result ? JSON.stringify(result) : null,
+  });
+  return result;
+}
+
+// ---------- status ----------
+
+export async function allocatePoint(stat: Stat) {
+  await db.insert(statAllocations).values({ id: uuidv7(), ...stamps(), stat, points: 1 });
+}
+
+export async function activateSkill(skill: SkillId) {
+  await db.insert(skillUses).values({ id: uuidv7(), ...stamps(), skill, day: await todayKey() });
+}
+
+/** Undo today's use of a skill (refunds its MP, since the engine only counts live rows). */
+export async function cancelSkillToday(skill: SkillId) {
+  const day = await todayKey();
+  await db
+    .update(skillUses)
+    .set({ deletedAt: new Date(), ...touched() })
+    .where(and(eq(skillUses.skill, skill), eq(skillUses.day, day), isNull(skillUses.deletedAt)));
+}
+
+// ---------- penalty quest ----------
+
+export async function setSurvival(day: string, quest: SurvivalQuest) {
+  await db
+    .update(dayResults)
+    .set({ survivalStatus: JSON.stringify(quest), ...touched() })
+    .where(eq(dayResults.day, day));
+}
+
 // ---------- dev tools ----------
 
 /**
@@ -213,6 +314,22 @@ export function logsQuery() {
 
 export function settingsQuery() {
   return db.select().from(settings).where(eq(settings.id, SETTINGS_ID));
+}
+
+export function storeItemsQuery() {
+  return db.select().from(storeItems).where(isNull(storeItems.deletedAt)).orderBy(asc(storeItems.cost));
+}
+
+export function purchasesQuery() {
+  return db.select().from(purchases).where(isNull(purchases.deletedAt));
+}
+
+export function skillUsesQuery() {
+  return db.select().from(skillUses).where(isNull(skillUses.deletedAt));
+}
+
+export function allocationsQuery() {
+  return db.select().from(statAllocations).where(isNull(statAllocations.deletedAt));
 }
 
 export function dayResultsQuery() {

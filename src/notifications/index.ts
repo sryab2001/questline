@@ -48,6 +48,10 @@ export interface ReminderPlan {
   todayCleared: number;
   /** Whether a goal exists at all; with none there is nothing to remind about. */
   hasHabits: boolean;
+  /** Rest Day is active: no warning today. */
+  restedToday: boolean;
+  /** End of a running penalty quest (ms), if any. */
+  survivalDeadline: number | null;
 }
 
 /** Replaces every scheduled reminder with a fresh set built from the current state. */
@@ -75,7 +79,7 @@ export async function syncReminders(plan: ReminderPlan, now = new Date()) {
     at.setDate(at.getDate() + i);
     at.setHours(plan.warningHour, 0, 0, 0);
     if (at <= now) continue;
-    if (i === 0 && (plan.todayTotal === 0 || remaining === 0)) continue;
+    if (i === 0 && (plan.todayTotal === 0 || remaining === 0 || plan.restedToday)) continue;
 
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -86,6 +90,15 @@ export async function syncReminders(plan: ReminderPlan, now = new Date()) {
             : 'The Daily Quest is not complete. Failure will result in a penalty.',
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at, channelId: CHANNEL_ID },
+    });
+  }
+
+  // Penalty quest: warn 30 minutes before time runs out.
+  const survivalWarnAt = plan.survivalDeadline ? plan.survivalDeadline - 30 * 60_000 : 0;
+  if (survivalWarnAt > now.getTime()) {
+    await Notifications.scheduleNotificationAsync({
+      content: { title: 'PENALTY QUEST: SURVIVAL', body: '30 minutes remain. Clear your goals or take the full penalty.' },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(survivalWarnAt), channelId: CHANNEL_ID },
     });
   }
 }

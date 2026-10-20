@@ -50,6 +50,43 @@ export const MAX_HP = 100;
 export const FAILED_DAY_HP_LOSS = 25;
 export const CLEARED_DAY_HP_GAIN = 10;
 
+/** Gold and ability points. */
+export const GOLD_PER_GOAL = 40;
+export const GOLD_DAILY_CLEAR = 150;
+export const POINTS_PER_DAILY_CLEAR = 3;
+
+/** MP powers skills; it regenerates from cleared goals. */
+export const MAX_MP = 60;
+export const MP_PER_GOAL = 5;
+
+export const SKILLS = {
+  rest_day: {
+    name: 'Rest Day',
+    description: "Today's goals carry no penalty. Your streak is kept.",
+    mpCost: 50,
+    unlockLevel: 3,
+  },
+} as const;
+export type SkillId = keyof typeof SKILLS;
+
+/** Penalty quest "Survival": clearing it halves that day's penalty. */
+export const SURVIVAL_HOURS = 4;
+export const SURVIVAL_PENALTY_FACTOR = 0.5;
+
+/** System items sold in the Store. */
+export const SYSTEM_ITEMS = {
+  shield: {
+    name: 'Streak Shield',
+    description: 'Absorbs one failed day: no penalty, streak kept. Used automatically.',
+    cost: 1000,
+  },
+  blessed_box: { name: 'Blessed Random Box', description: 'Contains a reward you want, from your list.', cost: 600 },
+  cursed_box: { name: 'Cursed Random Box', description: 'Contains an item you need.', cost: 200 },
+} as const;
+export type SystemItemId = keyof typeof SYSTEM_ITEMS;
+
+export const MP_POTION_AMOUNT = 30;
+
 /** Every stat starts here. */
 export const BASE_STAT = 10;
 

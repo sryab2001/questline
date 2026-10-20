@@ -1,10 +1,11 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GainToast } from '@/components/gain-toast';
 import { LogSheet } from '@/components/log-sheet';
 import { ProgressBar } from '@/components/progress-bar';
 import { QuestRow } from '@/components/quest-row';
@@ -12,16 +13,14 @@ import { SysButton } from '@/components/sys-button';
 import { SysText } from '@/components/sys-text';
 import { SystemWindow } from '@/components/system-window';
 import { addHabits, logProgress, SAMPLE_HABITS } from '@/db/actions';
-import type { GoalProgress } from '@/engine';
+import { GOLD_DAILY_CLEAR, type GoalProgress, nextResetAt, POINTS_PER_DAILY_CLEAR } from '@/engine';
+import { useClearEvents } from '@/hooks/use-clear-events';
 import { usePlayerState } from '@/hooks/use-player-state';
 import { colors, fonts } from '@/theme';
 
-/** "HH:MM" until the next daily reset, in the phone's local time. */
-function timeLeft(now: Date, resetHour: number) {
-  const reset = new Date(now);
-  reset.setHours(resetHour, 0, 0, 0);
-  if (reset <= now) reset.setDate(reset.getDate() + 1);
-  const mins = Math.max(0, Math.floor((reset.getTime() - now.getTime()) / 60_000));
+/** "HH:MM" from now until `until`. */
+function hhmm(now: Date, until: Date | number) {
+  const mins = Math.max(0, Math.floor((new Date(until).getTime() - now.getTime()) / 60_000));
   return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
 }
 
@@ -30,8 +29,12 @@ const isSimple = (g: GoalProgress) => g.target === 1 && !g.unit;
 export default function QuestsScreen() {
   const player = usePlayerState();
   const [openId, setOpenId] = useState<string | null>(null);
+  const goals = player?.state.today.goals;
+  const habits = player?.habits;
+  const grades = useMemo(() => new Map((habits ?? []).map((h) => [h.id, h.grade])), [habits]);
+  const clearEvent = useClearEvents(goals ?? [], grades, player?.today ?? '');
   if (!player) return null;
-  const { state, settings, now } = player;
+  const { state, settings, now, activeSurvival } = player;
   const openGoal = state.today.goals.find((g) => g.habitId === openId) ?? null;
 
   const onPressGoal = async (g: GoalProgress) => {
@@ -65,12 +68,31 @@ export default function QuestsScreen() {
               <SysText variant="caption" style={{ fontSize: 11, letterSpacing: 1.3 }}>
                 TIME LIMIT
               </SysText>
-              <SysText style={styles.timer}>{timeLeft(now, settings.resetHour)}</SysText>
+              <SysText style={styles.timer}>{hhmm(now, nextResetAt(now, settings.resetHour))}</SysText>
             </View>
           </View>
           <Meter label="EXP" value={state.xpIntoLevel} max={state.xpForNext} color={colors.cyan} />
           <Meter label="HP" value={state.hp} max={state.maxHp} color={colors.dangerSoft} />
         </View>
+
+        {activeSurvival ? (
+          <SystemWindow variant="danger" title="PENALTY QUEST" pulse>
+            <SysText style={styles.bannerTitle}>SURVIVAL</SysText>
+            <SysText style={styles.bannerText}>
+              Clear {Math.max(0, activeSurvival.quest.required - state.today.cleared)} more goal
+              {activeSurvival.quest.required - state.today.cleared === 1 ? '' : 's'} to halve your penalty.
+            </SysText>
+            <SysText style={[styles.timer, { textAlign: 'center', color: colors.dangerSoft }]}>
+              {hhmm(now, activeSurvival.quest.deadline)} left
+            </SysText>
+          </SystemWindow>
+        ) : null}
+
+        {state.today.rested ? (
+          <SystemWindow variant="epic" title="REST DAY">
+            <SysText style={styles.bannerText}>Skill active. Today carries no penalty and your streak is safe.</SysText>
+          </SystemWindow>
+        ) : null}
 
         <SystemWindow
           title="QUEST INFO"
@@ -105,7 +127,22 @@ export default function QuestsScreen() {
             </View>
           )}
 
-          {state.today.total > 0 && !state.today.allCleared ? (
+          {state.today.total > 0 ? (
+            <View style={styles.rewards}>
+              <SysText variant="label" style={{ fontSize: 12 }}>
+                REWARDS
+              </SysText>
+              <View style={styles.chips}>
+                {['Status Recovery', `+${POINTS_PER_DAILY_CLEAR} Ability Points`, `+${GOLD_DAILY_CLEAR} G`].map((r) => (
+                  <View key={r} style={styles.chip}>
+                    <SysText style={[styles.chipText, r.endsWith('G') && { color: colors.gold }]}>{r}</SysText>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {state.today.total > 0 && !state.today.allCleared && !state.today.rested ? (
             <SysText style={styles.warning}>
               <SysText style={[styles.warning, { fontFamily: fonts.bodySemi }]}>WARNING: </SysText>
               Failure to complete the daily quest will result in an appropriate penalty.
@@ -126,6 +163,7 @@ export default function QuestsScreen() {
           <SysButton label="ALL QUESTS" variant="ghost" style={{ flex: 1 }} onPress={() => router.push('/habits')} />
         </View>
       </ScrollView>
+      <GainToast event={clearEvent} />
       <LogSheet goal={openGoal} onClose={() => setOpenId(null)} />
     </SafeAreaView>
   );
@@ -178,4 +216,10 @@ const styles = StyleSheet.create({
   },
   warning: { fontSize: 12, lineHeight: 18, color: colors.dangerSoft, textAlign: 'center' },
   actions: { flexDirection: 'row', gap: 10 },
+  bannerTitle: { fontFamily: fonts.display, fontSize: 22, letterSpacing: 3, color: '#fbe9eb', textAlign: 'center' },
+  bannerText: { fontSize: 13, lineHeight: 20, textAlign: 'center', color: colors.textSoft },
+  rewards: { gap: 8, borderTopWidth: 1, borderTopColor: colors.borderMuted, paddingTop: 10 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { borderWidth: 1, borderColor: colors.borderMuted, paddingVertical: 4, paddingHorizontal: 8 },
+  chipText: { fontSize: 12, color: colors.text },
 });
