@@ -18,6 +18,12 @@ export const settings = sqliteTable('settings', {
   resetHour: integer('reset_hour').notNull().default(0),
   serverUrl: text('server_url'),
   lastPullAt: integer('last_pull_at', { mode: 'timestamp_ms' }),
+  /** Highest level the Level Up overlay has been shown for. */
+  lastSeenLevel: integer('last_seen_level').notNull().default(1),
+  /** Local hour for the "Daily Quest has arrived" notification. */
+  morningHour: integer('morning_hour').notNull().default(7),
+  /** Local hour for the "penalty incoming" warning. */
+  warningHour: integer('warning_hour').notNull().default(21),
 });
 
 export const habits = sqliteTable('habits', {
@@ -51,6 +57,10 @@ export const dayResults = sqliteTable(
     day: text('day').notNull(),
     cleared: integer('cleared').notNull(),
     total: integer('total').notNull(),
+    /** Frozen per-goal outcome of the closed day (engine DayOutcome goals). */
+    outcomesJson: text('outcomes_json').notNull().default('[]'),
+    /** The player has seen the result (penalty screen dismissed). */
+    acknowledged: integer('acknowledged', { mode: 'boolean' }).notNull().default(false),
     penaltyJson: text('penalty_json'),
     survivalStatus: text('survival_status'),
   },

@@ -11,6 +11,7 @@ import { StyleSheet, View } from 'react-native';
 import { SysText } from '@/components/sys-text';
 import { ensureSettings } from '@/db/actions';
 import { db } from '@/db/client';
+import { PlayerProvider } from '@/hooks/use-player-state';
 import { colors } from '@/theme';
 
 import migrations from '../../drizzle/migrations';
@@ -51,10 +52,15 @@ export default function RootLayout() {
   if (!ready) return null;
 
   return (
-    <>
+    <PlayerProvider>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
-    </>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'fade_from_bottom' }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="habit/[id]" />
+        <Stack.Screen name="habits" />
+        <Stack.Screen name="settings" />
+      </Stack>
+    </PlayerProvider>
   );
 }
 

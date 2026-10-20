@@ -51,7 +51,7 @@ export function SystemWindow({ variant = 'system', title, icon, pulse = false, s
         {title ? (
           <View style={[styles.pill, { borderColor: p.border }]}>
             {icon}
-            <SysText style={[styles.pillText, { color: variant === 'system' ? undefined : p.accent }]}>{title}</SysText>
+            <SysText style={[styles.pillText, variant !== 'system' && { color: p.accent }]}>{title}</SysText>
           </View>
         ) : null}
         {children}

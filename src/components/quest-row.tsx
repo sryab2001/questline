@@ -9,19 +9,26 @@ import { SysText } from './sys-text';
 interface Props {
   goal: GoalProgress;
   onPress: () => void;
+  onLongPress?: () => void;
+}
+
+function fmt(n: number) {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 function formatProgress(g: GoalProgress) {
   if (g.target === 1 && !g.unit) return g.done ? '[Complete]' : '[Incomplete]';
   const shown = Math.min(g.progress, g.target);
-  return `[${shown}/${g.target}]${g.unit ? ` ${g.unit}` : ''}`;
+  return `[${fmt(shown)}/${fmt(g.target)}]${g.unit ? ` ${g.unit}` : ''}`;
 }
 
-export function QuestRow({ goal, onPress }: Props) {
+export function QuestRow({ goal, onPress, onLongPress }: Props) {
   const done = goal.done;
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: done }}
       accessibilityLabel={`${goal.name}, ${formatProgress(goal)}`}

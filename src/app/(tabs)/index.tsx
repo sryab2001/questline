@@ -1,9 +1,14 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LogSheet } from '@/components/log-sheet';
 import { ProgressBar } from '@/components/progress-bar';
 import { QuestRow } from '@/components/quest-row';
+import { SysButton } from '@/components/sys-button';
 import { SysText } from '@/components/sys-text';
 import { SystemWindow } from '@/components/system-window';
 import { addHabits, logProgress, SAMPLE_HABITS } from '@/db/actions';
@@ -11,15 +16,34 @@ import type { GoalProgress } from '@/engine';
 import { usePlayerState } from '@/hooks/use-player-state';
 import { colors, fonts } from '@/theme';
 
-function toggleGoal(goal: GoalProgress) {
-  // Phase 0: a tap completes the goal, a second tap undoes it.
-  return logProgress(goal.habitId, goal.done ? -goal.progress : goal.target - goal.progress);
+/** "HH:MM" until the next daily reset, in the phone's local time. */
+function timeLeft(now: Date, resetHour: number) {
+  const reset = new Date(now);
+  reset.setHours(resetHour, 0, 0, 0);
+  if (reset <= now) reset.setDate(reset.getDate() + 1);
+  const mins = Math.max(0, Math.floor((reset.getTime() - now.getTime()) / 60_000));
+  return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
 }
+
+const isSimple = (g: GoalProgress) => g.target === 1 && !g.unit;
 
 export default function QuestsScreen() {
   const player = usePlayerState();
+  const [openId, setOpenId] = useState<string | null>(null);
   if (!player) return null;
-  const { state, playerName } = player;
+  const { state, settings, now } = player;
+  const openGoal = state.today.goals.find((g) => g.habitId === openId) ?? null;
+
+  const onPressGoal = async (g: GoalProgress) => {
+    if (!isSimple(g)) return setOpenId(g.habitId);
+    await logProgress(g.habitId, g.done ? -g.progress : g.target - g.progress);
+    (g.done
+      ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+      : Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+    ).catch(() => {});
+  };
+
+  const editGoal = (g: GoalProgress) => router.push({ pathname: '/habit/[id]', params: { id: g.habitId } });
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -31,29 +55,26 @@ export default function QuestsScreen() {
                 <SysText style={styles.rankText}>{state.rank}</SysText>
               </View>
               <View style={{ gap: 2 }}>
-                <SysText variant="title">{playerName.toUpperCase()}</SysText>
+                <SysText variant="title">{settings.playerName.toUpperCase()}</SysText>
                 <SysText variant="caption">
                   Lv. {state.level} · {state.rank}-Rank · {state.streak}-day streak
                 </SysText>
               </View>
             </View>
-          </View>
-          <View style={{ gap: 6 }}>
-            <View style={styles.xpLabels}>
-              <SysText variant="caption" style={{ letterSpacing: 1.1 }}>
-                EXP
+            <View style={{ alignItems: 'flex-end', gap: 2 }}>
+              <SysText variant="caption" style={{ fontSize: 11, letterSpacing: 1.3 }}>
+                TIME LIMIT
               </SysText>
-              <SysText variant="caption" style={{ fontVariant: ['tabular-nums'] }}>
-                {state.xpIntoLevel.toLocaleString()} / {state.xpForNext.toLocaleString()}
-              </SysText>
+              <SysText style={styles.timer}>{timeLeft(now, settings.resetHour)}</SysText>
             </View>
-            <ProgressBar value={state.xpIntoLevel / state.xpForNext} />
           </View>
+          <Meter label="EXP" value={state.xpIntoLevel} max={state.xpForNext} color={colors.cyan} />
+          <Meter label="HP" value={state.hp} max={state.maxHp} color={colors.dangerSoft} />
         </View>
 
         <SystemWindow
           title="QUEST INFO"
-          pulse
+          pulse={!state.today.allCleared}
           icon={<MaterialCommunityIcons name="alert-circle-outline" size={18} color={colors.cyan} />}>
           <SysText style={styles.arrival}>
             [Daily Quest: <SysText style={styles.questName}>Preparation to Become Powerful</SysText>] has arrived.
@@ -66,20 +87,21 @@ export default function QuestsScreen() {
             </SysText>
           </View>
 
-          {state.today.goals.length === 0 ? (
+          {player.habits.length === 0 ? (
             <View style={{ gap: 12 }}>
-              <SysText variant="body" style={{ textAlign: 'center' }}>
-                No quests yet. The System is waiting.
-              </SysText>
-              <Pressable style={styles.primaryButton} onPress={() => addHabits(SAMPLE_HABITS)}>
-                <SysText style={styles.primaryButtonText}>ADD SAMPLE QUESTS</SysText>
-              </Pressable>
+              <SysText style={{ textAlign: 'center' }}>No quests yet. The System is waiting.</SysText>
+              <SysButton label="ADD SAMPLE QUESTS" onPress={() => addHabits(SAMPLE_HABITS)} />
             </View>
+          ) : state.today.goals.length === 0 ? (
+            <SysText style={{ textAlign: 'center' }}>No goals scheduled today. Rest well, Player.</SysText>
           ) : (
             <View style={{ gap: 8 }}>
               {state.today.goals.map((g) => (
-                <QuestRow key={g.habitId} goal={g} onPress={() => toggleGoal(g)} />
+                <QuestRow key={g.habitId} goal={g} onPress={() => onPressGoal(g)} onLongPress={() => editGoal(g)} />
               ))}
+              <SysText variant="caption" style={{ textAlign: 'center', fontSize: 11 }}>
+                Tap to log progress · long-press to edit
+              </SysText>
             </View>
           )}
 
@@ -93,17 +115,44 @@ export default function QuestsScreen() {
             <SysText style={[styles.warning, { color: colors.cyan }]}>Daily Quest complete. Rewards received.</SysText>
           ) : null}
         </SystemWindow>
+
+        <View style={styles.actions}>
+          <SysButton
+            label="+ NEW QUEST"
+            variant="ghost"
+            style={{ flex: 1 }}
+            onPress={() => router.push({ pathname: '/habit/[id]', params: { id: 'new' } })}
+          />
+          <SysButton label="ALL QUESTS" variant="ghost" style={{ flex: 1 }} onPress={() => router.push('/habits')} />
+        </View>
       </ScrollView>
+      <LogSheet goal={openGoal} onClose={() => setOpenId(null)} />
     </SafeAreaView>
+  );
+}
+
+function Meter({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+  return (
+    <View style={{ gap: 5 }}>
+      <View style={styles.meterLabels}>
+        <SysText variant="caption" style={{ fontSize: 11, letterSpacing: 1.1 }}>
+          {label}
+        </SysText>
+        <SysText variant="caption" style={{ fontSize: 11, fontVariant: ['tabular-nums'] }}>
+          {value.toLocaleString()} / {max.toLocaleString()}
+        </SysText>
+      </View>
+      <ProgressBar value={value / max} color={color} height={label === 'HP' ? 4 : 6} glow={label !== 'HP'} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 20, gap: 20 },
-  header: { gap: 14 },
+  header: { gap: 12 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 1 },
   rankBadge: {
     width: 46,
     height: 46,
@@ -115,7 +164,8 @@ const styles = StyleSheet.create({
     boxShadow: '0 0 14px rgba(63,184,255,0.4)',
   },
   rankText: { fontFamily: fonts.display, fontSize: 24, color: colors.cyan },
-  xpLabels: { flexDirection: 'row', justifyContent: 'space-between' },
+  timer: { fontFamily: fonts.displaySemi, fontSize: 20, fontVariant: ['tabular-nums'] },
+  meterLabels: { flexDirection: 'row', justifyContent: 'space-between' },
   arrival: { textAlign: 'center', fontSize: 14, lineHeight: 21 },
   questName: { color: colors.cyan, fontFamily: fonts.bodySemi },
   goalsHeader: {
@@ -127,12 +177,5 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   warning: { fontSize: 12, lineHeight: 18, color: colors.dangerSoft, textAlign: 'center' },
-  primaryButton: {
-    minHeight: 48,
-    backgroundColor: colors.cyan,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 0 20px rgba(92,208,255,0.6)',
-  },
-  primaryButtonText: { fontFamily: fonts.display, fontSize: 17, letterSpacing: 3.4, color: colors.bg },
+  actions: { flexDirection: 'row', gap: 10 },
 });

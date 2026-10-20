@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router/js-tabs';
 import type { ComponentProps } from 'react';
 import type { ColorValue } from 'react-native';
 
+import { SystemNotices } from '@/components/system-notices';
 import { colors, fonts } from '@/theme';
 
 type IconProps = ComponentProps<typeof MaterialCommunityIcons>;
@@ -13,22 +14,25 @@ function TabIcon({ name, color, size }: { name: IconProps['name']; color: ColorV
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        sceneStyle: { backgroundColor: colors.bg },
-        tabBarStyle: { backgroundColor: colors.tabBar, borderTopColor: colors.borderMuted },
-        tabBarActiveTintColor: colors.cyan,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: { fontFamily: fonts.displaySemi, fontSize: 12, letterSpacing: 1.2 },
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{ title: 'QUESTS', tabBarIcon: (p) => <TabIcon name="checkbox-marked-outline" {...p} /> }}
-      />
-      <Tabs.Screen name="status" options={{ title: 'STATUS', tabBarIcon: (p) => <TabIcon name="account-outline" {...p} /> }} />
-      <Tabs.Screen name="store" options={{ title: 'STORE', tabBarIcon: (p) => <TabIcon name="shopping-outline" {...p} /> }} />
-      <Tabs.Screen name="class" options={{ title: 'CLASS', tabBarIcon: (p) => <TabIcon name="flag-variant-outline" {...p} /> }} />
-    </Tabs>
+    <>
+      <SystemNotices />
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          sceneStyle: { backgroundColor: colors.bg },
+          tabBarStyle: { backgroundColor: colors.tabBar, borderTopColor: colors.borderMuted },
+          tabBarActiveTintColor: colors.cyan,
+          tabBarInactiveTintColor: colors.textMuted,
+          tabBarLabelStyle: { fontFamily: fonts.displaySemi, fontSize: 12, letterSpacing: 1.2 },
+        }}>
+        <Tabs.Screen
+          name="index"
+          options={{ title: 'QUESTS', tabBarIcon: (p) => <TabIcon name="checkbox-marked-outline" {...p} /> }}
+        />
+        <Tabs.Screen name="status" options={{ title: 'STATUS', tabBarIcon: (p) => <TabIcon name="account-outline" {...p} /> }} />
+        <Tabs.Screen name="store" options={{ title: 'STORE', tabBarIcon: (p) => <TabIcon name="shopping-outline" {...p} /> }} />
+        <Tabs.Screen name="class" options={{ title: 'CLASS', tabBarIcon: (p) => <TabIcon name="flag-variant-outline" {...p} /> }} />
+      </Tabs>
+    </>
   );
 }

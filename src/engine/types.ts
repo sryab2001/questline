@@ -23,9 +23,25 @@ export interface LogEntry {
   amount: number;
 }
 
+/** What happened to one goal on a closed day. Frozen once the day closes. */
+export interface GoalOutcome {
+  habitId: string;
+  name: string;
+  stat: Stat;
+  grade: Grade;
+  done: boolean;
+}
+
+export interface DayOutcome {
+  day: DayKey;
+  goals: GoalOutcome[];
+}
+
 export interface EngineInput {
   habits: Habit[];
   logs: LogEntry[];
+  /** Outcomes of days that have already closed, in any order. */
+  closedDays: DayOutcome[];
   today: DayKey;
 }
 
@@ -39,6 +55,19 @@ export interface GoalProgress {
   done: boolean;
 }
 
+export interface DaySummary {
+  day: DayKey;
+  cleared: number;
+  total: number;
+  /** Had scheduled goals and missed at least one. */
+  failed: boolean;
+  xpGained: number;
+  /** EXP actually lost to the penalty (after the level floor). */
+  xpLost: number;
+  hpChange: number;
+  missed: string[];
+}
+
 export interface PlayerState {
   totalXp: number;
   level: number;
@@ -46,8 +75,12 @@ export interface PlayerState {
   xpForNext: number;
   rank: Rank;
   stats: Record<Stat, number>;
+  hp: number;
+  maxHp: number;
   /** Consecutive fully-cleared days, counting today only once it is cleared. */
   streak: number;
+  /** One entry per closed day, oldest first. */
+  history: DaySummary[];
   today: {
     goals: GoalProgress[];
     cleared: number;

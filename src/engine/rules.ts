@@ -42,6 +42,14 @@ export const GOAL_XP: Record<Grade, number> = {
 /** Bonus EXP when every scheduled goal of the day is cleared. */
 export const DAILY_CLEAR_BONUS_XP = 100;
 
+/** EXP lost for a failed Daily Quest. Never drops the player below their current level. */
+export const FAILED_DAY_PENALTY_XP = 150;
+
+/** HP (streak health) rules. */
+export const MAX_HP = 100;
+export const FAILED_DAY_HP_LOSS = 25;
+export const CLEARED_DAY_HP_GAIN = 10;
+
 /** Every stat starts here. */
 export const BASE_STAT = 10;
 
