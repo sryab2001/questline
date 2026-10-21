@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+  <radialGradient id="bgGlow" cx="50%" cy="52%" r="62%">
+    <stop offset="0" stop-color="#101a38"/><stop offset="1" stop-color="#050912"/>
+  </radialGradient>
+  <linearGradient id="rim" x1="0.15" y1="0" x2="0.85" y2="1">
+    <stop offset="0" stop-color="#FFE9A8"/><stop offset="0.28" stop-color="#F6B93B"/>
+    <stop offset="0.62" stop-color="#C9781F"/><stop offset="0.82" stop-color="#F6B93B"/><stop offset="1" stop-color="#7A4510"/>
+  </linearGradient>
+  <linearGradient id="goldV" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#FFE9A8"/><stop offset="0.5" stop-color="#F6B93B"/><stop offset="1" stop-color="#C9781F"/>
+  </linearGradient>
+  <radialGradient id="field" cx="50%" cy="42%" r="70%">
+    <stop offset="0" stop-color="#241b3b"/><stop offset="0.6" stop-color="#130f20"/><stop offset="1" stop-color="#07060d"/>
+  </radialGradient>
+  <radialGradient id="sunCore" cx="42%" cy="38%" r="62%">
+    <stop offset="0" stop-color="#FFF6DC"/><stop offset="0.35" stop-color="#FFD66B"/>
+    <stop offset="0.8" stop-color="#F6B93B"/><stop offset="1" stop-color="#E8892B"/>
+  </radialGradient>
+  <radialGradient id="rivet" cx="35%" cy="30%" r="70%">
+    <stop offset="0" stop-color="#FFF6DC"/><stop offset="0.5" stop-color="#F6B93B"/><stop offset="1" stop-color="#7A4510"/>
+  </radialGradient>
+  <radialGradient id="gem" cx="35%" cy="30%" r="70%">
+    <stop offset="0" stop-color="#fff1d6"/><stop offset="0.4" stop-color="#ff9a3c"/><stop offset="1" stop-color="#8a3a08"/>
+  </radialGradient>
+  <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#7d8899"/><stop offset="0.3" stop-color="#f4f7fb"/>
+    <stop offset="0.5" stop-color="#c3ccd8"/><stop offset="0.52" stop-color="#7d8899"/>
+    <stop offset="0.8" stop-color="#c3ccd8"/><stop offset="1" stop-color="#4b5465"/>
+  </linearGradient>
+  <linearGradient id="grip" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#2b180c"/><stop offset="0.45" stop-color="#4a2c18"/><stop offset="1" stop-color="#2b180c"/>
+  </linearGradient>
+  <filter id="glowL" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="26"/></filter>
+  <filter id="glowM" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="12"/></filter>
+  <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="10"/></filter>
+  <clipPath id="fieldClip"><path d="M328 326 Q512 280 696 326 L696 528 Q696 722 512 816 Q328 722 328 528 Z"/></clipPath>
+  <mask id="outsideShield" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+    <rect width="1024" height="1024" fill="#fff"/><path d="M296 300 Q512 246 728 300 L728 528 Q728 742 512 852 Q296 742 296 528 Z" fill="#000"/>
+  </mask>
+</defs>
+  <rect width="1024" height="1024" fill="url(#bgGlow)"/><circle cx="512" cy="540" r="250" fill="#E8892B" opacity="0.16" filter="url(#glowL)"/>
+  
+  <path d="M491 262 L533 262 L529 900 L512 968 L495 900 Z" fill="url(#blade)" stroke="#4b5465" stroke-width="3"/>
+  <path d="M509 280 L515 280 L514 880 L510 880 Z" fill="#4b5465" opacity="0.7"/>
+  <path d="M495 268 L499 900" stroke="#ffffff" stroke-width="2.5" opacity="0.7"/>
+  <path d="M378 236 Q512 220 646 236 L660 252 Q646 262 632 262 Q512 252 392 262 Q378 262 364 252 Z" fill="url(#goldV)" stroke="#7A4510" stroke-width="3"/>
+  <path d="M396 240 Q512 228 628 240" fill="none" stroke="#FFE9A8" stroke-width="3" opacity="0.8"/>
+  <rect x="486" y="224" width="52" height="46" rx="10" fill="url(#goldV)" stroke="#7A4510" stroke-width="3"/>
+  <circle cx="512" cy="247" r="11" fill="url(#gem)" stroke="#7A4510" stroke-width="2"/>
+  <rect x="497" y="146" width="30" height="80" rx="6" fill="url(#grip)"/>
+  <path d="M497 166 L527 156" stroke="#2b180c" stroke-width="4" opacity="0.9"/><path d="M497 182 L527 172" stroke="#2b180c" stroke-width="4" opacity="0.9"/><path d="M497 198 L527 188" stroke="#2b180c" stroke-width="4" opacity="0.9"/><path d="M497 214 L527 204" stroke="#2b180c" stroke-width="4" opacity="0.9"/>
+  <circle cx="512" cy="128" r="27" fill="url(#rivet)" stroke="#7A4510" stroke-width="3"/>
+  <circle cx="512" cy="128" r="11" fill="url(#gem)"/>
+  <path d="M296 300 Q512 246 728 300 L728 528 Q728 742 512 852 Q296 742 296 528 Z" transform="translate(0 12)" fill="#000" opacity="0.38" filter="url(#shadow)"/>
+  <path d="M296 300 Q512 246 728 300 L728 528 Q728 742 512 852 Q296 742 296 528 Z" fill="url(#rim)" stroke="#7A4510" stroke-width="4"/>
+  <path d="M328 326 Q512 280 696 326 L696 528 Q696 722 512 816 Q328 722 328 528 Z" fill="url(#field)" stroke="#7A4510" stroke-width="5"/>
+  <path d="M340 334 Q512 290 684 334" fill="none" stroke="#FFE9A8" stroke-width="3" opacity="0.55"/>
+  <path d="M352 346 Q512 306 672 346 L672 528 Q672 706 512 788 Q352 706 352 528 Z" fill="none" stroke="#F6B93B" stroke-width="3" opacity="0.4"/>
+  <circle cx="512" cy="273" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/><circle cx="338" cy="300" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/><circle cx="686" cy="300" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/><circle cx="312" cy="420" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/><circle cx="712" cy="420" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/><circle cx="312" cy="540" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/><circle cx="712" cy="540" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/><circle cx="338" cy="660" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/><circle cx="686" cy="660" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/><circle cx="400" cy="760" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/><circle cx="624" cy="760" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/><circle cx="512" cy="832" r="9.5" fill="url(#rivet)" stroke="#7A4510" stroke-width="1.5"/>
+  <g clip-path="url(#fieldClip)">
+    <circle cx="512" cy="540" r="190" fill="#E8892B" opacity="0.28" filter="url(#glowL)"/>
+    <path d="M523.62 444.71 L560.38 296.77 L537.73 447.51 Z M559.20 456.41 L649.78 333.80 L571.17 464.40 Z M587.60 480.83 L718.20 402.22 L595.59 492.80 Z M604.49 514.27 L755.23 491.62 L607.29 528.38 Z M607.29 551.62 L755.23 588.38 L604.49 565.73 Z M595.59 587.20 L718.20 677.78 L587.60 599.17 Z M571.17 615.60 L649.78 746.20 L559.20 623.59 Z M537.73 632.49 L560.38 783.23 L523.62 635.29 Z M500.38 635.29 L463.62 783.23 L486.27 632.49 Z M464.80 623.59 L374.22 746.20 L452.83 615.60 Z M436.40 599.17 L305.80 677.78 L428.41 587.20 Z M419.51 565.73 L268.77 588.38 L416.71 551.62 Z M416.71 528.38 L268.77 491.62 L419.51 514.27 Z M428.41 492.80 L305.80 402.22 L436.40 480.83 Z M452.83 464.40 L374.22 333.80 L464.80 456.41 Z M486.27 447.51 L463.62 296.77 L500.38 444.71 Z " fill="#E8892B" opacity="0.85"/>
+    <g filter="url(#glowM)" opacity="0.7"><path d="M500.83 448.68 C482.31 379.22 515.98 376.55 524.16 318.33 C513.99 376.51 536.78 378.39 523.17 448.68 Z M538.71 451.96 C545.05 408.08 566.50 415.40 584.78 384.15 C565.28 414.87 579.03 421.67 555.37 458.86 Z M568.67 467.53 C604.70 405.32 630.39 427.24 677.34 391.85 C629.01 425.80 643.80 443.25 584.47 483.33 Z M593.14 496.63 C628.65 470.08 638.65 490.43 673.66 481.26 C638.15 489.19 643.07 503.73 600.04 513.29 Z M603.32 528.83 C672.78 510.31 675.45 543.98 733.67 552.16 C675.49 541.99 673.61 564.78 603.32 551.17 Z M600.04 566.71 C643.92 573.05 636.60 594.50 667.85 612.78 C637.13 593.28 630.33 607.03 593.14 583.37 Z M584.47 596.67 C646.68 632.70 624.76 658.39 660.15 705.34 C626.20 657.01 608.75 671.80 568.67 612.47 Z M555.37 621.14 C581.92 656.65 561.57 666.65 570.74 701.66 C562.81 666.15 548.27 671.07 538.71 628.04 Z M523.17 631.32 C541.69 700.78 508.02 703.45 499.84 761.67 C510.01 703.49 487.22 701.61 500.83 631.32 Z M485.29 628.04 C478.95 671.92 457.50 664.60 439.22 695.85 C458.72 665.13 444.97 658.33 468.63 621.14 Z M455.33 612.47 C419.30 674.68 393.61 652.76 346.66 688.15 C394.99 654.20 380.20 636.75 439.53 596.67 Z M430.86 583.37 C395.35 609.92 385.35 589.57 350.34 598.74 C385.85 590.81 380.93 576.27 423.96 566.71 Z M420.68 551.17 C351.22 569.69 348.55 536.02 290.33 527.84 C348.51 538.01 350.39 515.22 420.68 528.83 Z M423.96 513.29 C380.08 506.95 387.40 485.50 356.15 467.22 C386.87 486.72 393.67 472.97 430.86 496.63 Z M439.53 483.33 C377.32 447.30 399.24 421.61 363.85 374.66 C397.80 422.99 415.25 408.20 455.33 467.53 Z M468.63 458.86 C442.08 423.35 462.43 413.35 453.26 378.34 C461.19 413.85 475.73 408.93 485.29 451.96 Z " fill="#F6B93B"/></g>
+    <path d="M500.83 448.68 C482.31 379.22 515.98 376.55 524.16 318.33 C513.99 376.51 536.78 378.39 523.17 448.68 Z M538.71 451.96 C545.05 408.08 566.50 415.40 584.78 384.15 C565.28 414.87 579.03 421.67 555.37 458.86 Z M568.67 467.53 C604.70 405.32 630.39 427.24 677.34 391.85 C629.01 425.80 643.80 443.25 584.47 483.33 Z M593.14 496.63 C628.65 470.08 638.65 490.43 673.66 481.26 C638.15 489.19 643.07 503.73 600.04 513.29 Z M603.32 528.83 C672.78 510.31 675.45 543.98 733.67 552.16 C675.49 541.99 673.61 564.78 603.32 551.17 Z M600.04 566.71 C643.92 573.05 636.60 594.50 667.85 612.78 C637.13 593.28 630.33 607.03 593.14 583.37 Z M584.47 596.67 C646.68 632.70 624.76 658.39 660.15 705.34 C626.20 657.01 608.75 671.80 568.67 612.47 Z M555.37 621.14 C581.92 656.65 561.57 666.65 570.74 701.66 C562.81 666.15 548.27 671.07 538.71 628.04 Z M523.17 631.32 C541.69 700.78 508.02 703.45 499.84 761.67 C510.01 703.49 487.22 701.61 500.83 631.32 Z M485.29 628.04 C478.95 671.92 457.50 664.60 439.22 695.85 C458.72 665.13 444.97 658.33 468.63 621.14 Z M455.33 612.47 C419.30 674.68 393.61 652.76 346.66 688.15 C394.99 654.20 380.20 636.75 439.53 596.67 Z M430.86 583.37 C395.35 609.92 385.35 589.57 350.34 598.74 C385.85 590.81 380.93 576.27 423.96 566.71 Z M420.68 551.17 C351.22 569.69 348.55 536.02 290.33 527.84 C348.51 538.01 350.39 515.22 420.68 528.83 Z M423.96 513.29 C380.08 506.95 387.40 485.50 356.15 467.22 C386.87 486.72 393.67 472.97 430.86 496.63 Z M439.53 483.33 C377.32 447.30 399.24 421.61 363.85 374.66 C397.80 422.99 415.25 408.20 455.33 467.53 Z M468.63 458.86 C442.08 423.35 462.43 413.35 453.26 378.34 C461.19 413.85 475.73 408.93 485.29 451.96 Z " fill="url(#goldV)"/>
+    <circle cx="512" cy="540" r="98" fill="#FFD66B" opacity="0.6" filter="url(#glowM)"/>
+    <circle cx="512" cy="540" r="92" fill="url(#sunCore)" stroke="#C9781F" stroke-width="4"/>
+    <circle cx="512" cy="540" r="70" fill="none" stroke="#E8892B" stroke-width="3" opacity="0.35"/>
+    <ellipse cx="482" cy="504" rx="30" ry="18" fill="#ffffff" opacity="0.35" transform="rotate(-30 482 504)"/>
+  </g></svg>

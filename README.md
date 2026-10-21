@@ -35,7 +35,7 @@ Expo SDK 57 (React Native + TypeScript), expo-router, expo-sqlite + Drizzle ORM 
 | `npm run typecheck` | TypeScript check |
 | `npm run lint` | ESLint |
 | `npm run db:generate` | Generate a Drizzle migration after editing `src/db/schema.ts` |
-| `node scripts/generate-icons.mjs` | Re-render the app icon, adaptive icon, splash and notification icon |
+| `node scripts/generate-icons.mjs` | Re-render the logo (`assets/brand/questline-logo.svg`) and every app icon from it |
 | `node scripts/generate-sounds.mjs` | Re-synthesize the sound effects in `assets/sounds/` |
 | `powershell -File server/package.ps1` | Build `dist/questline-server.tar.gz` for a Linux server |
 
