@@ -36,14 +36,22 @@ export default function ClassScreen() {
           <SystemWindow title="MAIN QUEST" variant="epic">
             <SysText style={{ textAlign: 'center', lineHeight: 21 }}>
               Turn a big goal (&quot;Learn GenAI&quot;, &quot;Run a half marathon&quot;) into chapters of small quests. Each chapter ends
-              with a Boss: build or prove what you learned.
+              with a Boss: build or prove what you learned. Pick a ready-made one from the Quest Board, or write your own.
             </SysText>
           </SystemWindow>
         ) : (
           quests.map((q) => <MainQuestCard key={q.id} quest={q} player={player} />)
         )}
 
-        <SysButton label="+ NEW MAIN QUEST" variant="ghost" onPress={() => router.push({ pathname: '/main-quest/[id]', params: { id: 'new' } })} />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <SysButton label="QUEST BOARD" style={{ flex: 1 }} onPress={() => router.push('/quest-board')} />
+          <SysButton
+            label="+ WRITE YOUR OWN"
+            variant="ghost"
+            style={{ flex: 1 }}
+            onPress={() => router.push({ pathname: '/main-quest/[id]', params: { id: 'new' } })}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

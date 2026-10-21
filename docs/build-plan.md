@@ -163,6 +163,9 @@ Also shipped in this round: app icon and splash, Awakening onboarding, history c
 - "✓ <quest>" buttons on the morning and evening notifications (up to three), "✓ DONE" on Urgent Quests. Handled by an `expo-task-manager` background task when the app is closed, and by a listener when it's open. Marking done is idempotent, and clearing the last quest cancels that evening's warning.
 - New app entry `index.ts` registers the widget handler and the background task before the router loads.
 
+### After Phase 6
+- **Quest Board**: 8 ready-made Main Quests (GenAI Engineer, Couch to Half Marathon, Strength Foundations, Learn a Language A1→A2, Read 12 Books, Cook 20 Dishes, 8-Week Meditation, Personal Finance Basics) written as outlines in `src/engine/quest-board.ts`. Accepting one makes an editable copy and can add and link its daily quest. Later: publish your own Main Quests to the server so others on it can accept them (needs a server collection).
+
 ## 6. Deployment
 
 - **App**: `eas build -p android --profile preview` produces an APK download link; install it on the phone. Later UI or logic fixes ship with `eas update` (no reinstall). No Play Store account is needed for personal use.

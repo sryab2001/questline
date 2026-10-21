@@ -124,6 +124,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
       'Big goals become chapters of small quests: Learn, Practice and Build. Chapters open in order; inside one, do the quests in any order. The Boss comes last: build or prove what you learned.',
       'Clearing a quest asks for one line on what you learned: recalling it is what makes it stick. Chapters can carry a Bounty, a real reward you set in advance and claim when the Boss falls.',
       `Link the daily habit that feeds the goal ("Study 30 min") to see its days and hours on the quest. Finishing a multi-chapter quest gives +${MAIN_QUEST_COMPLETE_XP} EXP, a rated item, a title and +2 to its stat. Paste an outline to set one up in seconds.`,
+      'Or pick one from the Quest Board: ready-made paths (GenAI Engineer, Couch to Half Marathon, Strength Foundations, a language, 12 books, cooking, meditation, personal finance). Accepting one gives you your own copy to edit, and can add the daily quest that feeds it.',
     ],
   },
   {

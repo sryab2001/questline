@@ -40,6 +40,8 @@ export interface MainQuestData {
   bounty: string;
   /** Title earned on completion (multi-chapter quests). */
   title: string;
+  /** Quest Board template it was accepted from, if any. */
+  templateId?: string;
   chapters: Chapter[];
 }
 
@@ -88,6 +90,7 @@ export function parseMainQuest(json: string): MainQuestData {
     habitId: d.habitId ?? null,
     bounty: d.bounty ?? '',
     title: d.title ?? '',
+    ...(d.templateId ? { templateId: d.templateId } : {}),
     chapters: (d.chapters ?? []).map((c) => ({ title: c.title ?? '', bounty: c.bounty ?? '', tasks: c.tasks ?? [] })),
   };
 }

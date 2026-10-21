@@ -155,6 +155,15 @@ export async function addHabits(list: HabitInput[]) {
   );
 }
 
+/** Adds one quest starting today and returns its id (e.g. to link it to a Main Quest). */
+export async function addHabit(h: HabitInput): Promise<string> {
+  const id = uuidv7();
+  const startDay = await todayKey();
+  const existing = await db.select({ id: habits.id }).from(habits).where(isNull(habits.deletedAt));
+  await db.insert(habits).values({ id, ...stamps(), ...h, sortOrder: existing.length, startDay });
+  return id;
+}
+
 export async function updateHabit(id: string, patch: Partial<HabitInput>) {
   await db.update(habits).set({ ...patch, ...touched() }).where(eq(habits.id, id));
 }
