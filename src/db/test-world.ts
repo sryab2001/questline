@@ -4,7 +4,17 @@
 // EXP, gold, levels and rewards from it exactly as it does for real play.
 import { isNull } from 'drizzle-orm';
 
-import { addDays, type DayKey, gateItem, weekday } from '@/engine';
+import {
+  addDays,
+  currentChapter,
+  type DayKey,
+  gateItem,
+  type Grade,
+  type MainQuestData,
+  type QuestTask,
+  type TaskType,
+  weekday,
+} from '@/engine';
 import { uuidv7 } from '@/lib/uuid';
 
 import { acknowledgeDays, closePendingDays, ensureSettings, todayKey, updateSettings } from './actions';
@@ -103,47 +113,117 @@ export async function seedTestWorld() {
   }
   await db.insert(checkins).values(checkinRows);
 
-  // Player decisions, in order: title, mastery, equipment, Job Change trial.
+  // Player decisions, in order: economy v2 from day 0, title, mastery, equipment, Job Change trial.
   const gateWeek = monday(day(14));
   const gateReward = gateItem(gateWeek);
   await db.insert(events).values([
+    { ...row(start, 7), kind: 'economy', ref: 'v2', day: start, dataJson: null },
     { ...row(day(10), 21), kind: 'title', ref: 'The Persistent', day: day(10), dataJson: null },
     { ...row(day(55), 21), kind: 'offer', ref: ids[2], day: day(55), dataJson: JSON.stringify({ kind: 'mastery', accepted: true }) },
     { ...row(addDays(gateWeek, 7), 9), kind: 'equip', ref: gateReward.slot, day: addDays(gateWeek, 7), dataJson: JSON.stringify({ itemId: gateReward.id }) },
     { ...row(addDays(today, -4), 9), kind: 'job_trial', ref: 'start', day: addDays(today, -4), dataJson: null },
   ]);
 
-  // Class Quests: one nearly finished chain, one counted goal, one just started.
-  const step = (title: string, grade: string, doneDay: DayKey | null, target?: number, count?: number) => ({
+  // Main Quests: a multi-chapter learning path (first chapter cleared, its bounty
+  // waiting to be claimed), a short chain one step from done, and a counted goal.
+  const task = (title: string, type: TaskType, grade: Grade, doneDay: DayKey | null, extra: Partial<QuestTask> = {}): QuestTask => ({
     title,
+    type,
     grade,
     doneDay,
-    ...(target ? { target, count: count ?? 0 } : {}),
+    ...extra,
   });
-  const quests = [
-    { name: 'Path of the Runner', steps: [step('Run 5 km without stopping', 'D', day(20)), step('Run 10 km', 'C', day(50)), step('Half marathon', 'A', null)] },
-    { name: 'Read 12 books', steps: [step('Finish books', 'B', null, 12, 7)] },
+  const genai: MainQuestData = {
+    v: 2,
+    stat: 'INT',
+    habitId: ids[5],
+    bounty: 'Mechanical keyboard',
+    title: 'Machine Mind Scholar',
+    chapters: [
+      {
+        title: 'Foundations',
+        bounty: 'Buy the AI Engineering book',
+        tasks: [
+          task('How LLMs work: tokens, context, sampling', 'learn', 'D', day(62), { note: 'Sampling temperature trades accuracy for variety.' }),
+          task('Call an LLM API from code', 'practice', 'C', day(64)),
+          task('Embeddings & vector similarity', 'learn', 'D', day(66)),
+          task('MCP: tools, resources, prompts', 'learn', 'D', day(69)),
+          task('Build an MCP server over my notes', 'build', 'B', day(72), { boss: true }),
+        ],
+      },
+      {
+        title: 'RAG',
+        tasks: [
+          task('Chunking strategies', 'learn', 'D', day(75)),
+          task('Vector DB + hybrid search', 'practice', 'C', day(77)),
+          task('Read 3 RAG papers', 'learn', 'C', null, { target: 3, count: 1 }),
+          task('Build a 20-question eval set', 'practice', 'C', null),
+          task('RAG over my docs with citations + eval', 'build', 'A', null, { boss: true }),
+        ],
+      },
+      {
+        title: 'Agents',
+        tasks: [
+          task('The tool-use loop', 'learn', 'C', null),
+          task('Planning and memory', 'learn', 'C', null),
+          task('Build an agent that files my receipts', 'build', 'A', null, { boss: true }),
+        ],
+      },
+      {
+        title: 'Context engineering & harnesses',
+        tasks: [
+          task('Compaction, retrieval, caching', 'learn', 'B', null),
+          task('Evals for agents', 'practice', 'B', null),
+          task('Build a mini harness with evals', 'build', 'S', null, { boss: true }),
+        ],
+      },
+    ],
+  };
+  const oneChapter = (title: string, tasks: QuestTask[]): MainQuestData => ({
+    v: 2,
+    stat: 'AGI',
+    habitId: null,
+    bounty: '',
+    title: '',
+    chapters: [{ title, tasks }],
+  });
+  const quests: { name: string; data: MainQuestData }[] = [
+    { name: 'Learn GenAI', data: genai },
     {
-      name: 'Learn GenAI',
-      steps: [step('LLM basics: tokens, context, sampling', 'D', day(70)), step('Embeddings & MCP', 'C', null), step('Build a RAG demo', 'B', null), step('Build an agent', 'A', null)],
+      name: 'Path of the Runner',
+      data: {
+        ...oneChapter('Distance', [
+          task('Run 5 km without stopping', 'practice', 'D', day(20)),
+          task('Run 10 km', 'practice', 'C', day(50)),
+          task('Half marathon', 'build', 'A', null, { boss: true }),
+        ]),
+        habitId: ids[1],
+        bounty: 'New running shoes',
+      },
     },
+    { name: 'Read 12 books', data: { ...oneChapter('Books', [task('Finish books', 'practice', 'B', null, { target: 12, count: 7 })]), stat: 'INT' } },
   ];
   await db.insert(classQuests).values(
-    quests.map((q) => {
-      const open = q.steps.findIndex((s) => !s.doneDay);
-      return { ...row(day(15)), name: q.name, rating: '', stepsJson: JSON.stringify(q.steps), currentStep: open, status: 'active' as const };
-    }),
+    quests.map((q) => ({
+      ...row(day(15)),
+      name: q.name,
+      rating: '',
+      stepsJson: JSON.stringify(q.data),
+      currentStep: currentChapter(q.data),
+      status: 'active' as const,
+    })),
   );
 
-  // Store: real-life treats, one already bought.
+  // Store: treats priced in days of effort (one already bought), and free unlocks.
   const treats = [
-    { name: 'Gaming hour', cost: 300 },
-    { name: 'Movie night', cost: 800 },
-    { name: 'New book', cost: 1500 },
-    { name: 'Eat out', cost: 2000 },
+    { name: 'Favourite coffee', cost: 100 },
+    { name: 'Movie night', cost: 500 },
+    { name: 'New book', cost: 1000 },
+    { name: 'Day trip', cost: 3000 },
   ].map((t) => ({ ...row(start, 9), ...t, kind: 'treat' as const }));
-  await db.insert(storeItems).values(treats);
-  await db.insert(purchases).values({ ...row(day(30), 20), storeItemId: treats[0].id, cost: 300, kind: 'treat', day: day(30) });
+  const unlockRows = ['Evening gaming', 'YouTube after dinner'].map((name) => ({ ...row(start, 9), name, cost: 0, kind: 'unlock' as const }));
+  await db.insert(storeItems).values([...treats, ...unlockRows]);
+  await db.insert(purchases).values({ ...row(day(30), 20), storeItemId: treats[1].id, cost: 500, kind: 'treat', day: day(30) });
 
   // Freeze the past days through the normal day close, then mark them seen so
   // old penalties don't pop up. Level-up, rewards and the Season recap still show once.

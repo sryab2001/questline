@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { SysText } from '@/components/sys-text';
-import { ensureSettings } from '@/db/actions';
+import { ensureEconomyV2, ensureSettings } from '@/db/actions';
 import { db, useWorld } from '@/db/client';
 import { seedTestWorldIfEmpty } from '@/db/test-world';
 import { PlayerProvider } from '@/hooks/use-player-state';
@@ -38,7 +38,7 @@ function WorldRoot() {
   const [seeded, setSeeded] = useState(false);
 
   useEffect(() => {
-    if (migrated) ensureSettings().then(seedTestWorldIfEmpty).then(() => setSeeded(true));
+    if (migrated) ensureSettings().then(seedTestWorldIfEmpty).then(ensureEconomyV2).then(() => setSeeded(true));
   }, [migrated]);
 
   const ready = (fontsLoaded || fontError) && seeded;
@@ -69,7 +69,8 @@ function WorldRoot() {
         <Stack.Screen name="history" />
         <Stack.Screen name="guide" />
         <Stack.Screen name="achievements" />
-        <Stack.Screen name="class-quest/[id]" />
+        <Stack.Screen name="main-quest/[id]" />
+        <Stack.Screen name="record" />
         <Stack.Screen name="awakening" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
     </PlayerProvider>

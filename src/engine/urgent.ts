@@ -48,9 +48,9 @@ export function urgentQuestFor(
   };
 }
 
-/** The quest's window as real Dates on the phone's local clock. */
-export function urgentWindow(q: UrgentQuest): { start: Date; end: Date } {
+/** The quest's window as real Dates on the phone's local clock. Gear can keep it open longer. */
+export function urgentWindow(q: UrgentQuest, extraMinutes = 0): { start: Date; end: Date } {
   const [y, m, d] = q.day.split('-').map(Number);
   const at = (min: number) => new Date(y, m - 1, d, Math.floor(min / 60), min % 60, 0, 0);
-  return { start: at(q.startMinute), end: at(q.endMinute) };
+  return { start: at(q.startMinute), end: at(q.endMinute + extraMinutes) };
 }

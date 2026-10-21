@@ -5,7 +5,6 @@ import { AppState } from 'react-native';
 import {
   allocationsQuery,
   checkinsQuery,
-  type ClassStep,
   classQuestsQuery,
   closePendingDays,
   dayResultsQuery,
@@ -30,7 +29,9 @@ import {
   type DayOutcome,
   type DaySummary,
   type Habit,
+  type MainQuestData,
   type OfferKind,
+  parseMainQuest,
   parseSurvival,
   type PlayerState,
   type Slot,
@@ -52,6 +53,8 @@ export interface StoreItem {
   id: string;
   name: string;
   cost: number;
+  /** "treat" is bought with gold; "unlock" is free once the Daily Quest is kept. */
+  kind: 'treat' | 'unlock';
 }
 
 export interface PurchaseRecord {
@@ -76,10 +79,10 @@ export interface UrgentState {
   status: 'upcoming' | 'active' | 'done' | 'skipped' | 'expired';
 }
 
-export interface ClassQuestRow {
+export interface MainQuestRow {
   id: string;
   name: string;
-  steps: ClassStep[];
+  data: MainQuestData;
 }
 
 export interface PlayerData {
@@ -114,7 +117,7 @@ export interface PlayerData {
   urgent: UrgentState | null;
   /** Upcoming Urgent Quests (today and the next days) that still need a notification. */
   urgentSchedule: { at: number; text: string }[];
-  classQuests: ClassQuestRow[];
+  mainQuests: MainQuestRow[];
 }
 
 const PlayerContext = createContext<PlayerData | null>(null);
@@ -166,7 +169,9 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
     // Player decisions in the order they were made (timelines depend on order).
     const ordered = [...eventRows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     const data = (e: (typeof eventRows)[number]) => (e.dataJson ? JSON.parse(e.dataJson) : {});
-    const classQuests: ClassQuestRow[] = classRows.map((q) => ({ id: q.id, name: q.name, steps: JSON.parse(q.stepsJson) as ClassStep[] }));
+    const mainQuests: MainQuestRow[] = classRows.map((q) => ({ id: q.id, name: q.name, data: parseMainQuest(q.stepsJson) }));
+    // Economy v2 starts on the earliest recorded cutover (one per device that upgraded).
+    const economyDays = eventRows.filter((e) => e.kind === 'economy').map((e) => e.day).sort();
 
     const parsedPurchases = purchaseRows.map((p) => ({ ...p, result: p.resultJson ? (JSON.parse(p.resultJson) as BoxResult) : null }));
     const state = computeState({
@@ -188,7 +193,9 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
       titleChanges: ordered.filter((e) => e.kind === 'title').map((e) => ({ title: e.ref, day: e.day })),
       jobChanges: ordered.filter((e) => e.kind === 'job').map((e) => ({ jobId: e.ref, day: e.day })),
       jobTrials: ordered.filter((e) => e.kind === 'job_trial').map((e) => ({ day: e.day })),
-      classQuests: classQuests.map((q) => ({ id: q.id, name: q.name, steps: q.steps.map((st) => ({ title: st.title, grade: st.grade, doneDay: st.doneDay })) })),
+      mainQuests,
+      forges: ordered.filter((e) => e.kind === 'forge').map((e) => ({ day: e.day, inputs: (data(e).inputs as string[] | undefined) ?? [] })),
+      economyFrom: economyDays[0] ?? null,
       surprises: s.surprisesOn,
       urgentCleared: [...urgentAnswers.entries()]
         .filter(([, a]) => a.outcome === 'done')
@@ -200,7 +207,7 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
     const todayQuest = urgentFor(today);
     let urgent: UrgentState | null = null;
     if (todayQuest) {
-      const { start, end } = urgentWindow(todayQuest);
+      const { start, end } = urgentWindow(todayQuest, state.modifiers.urgentMinutes);
       const answer = urgentAnswers.get(today)?.outcome;
       const status = answer ?? (now < start ? 'upcoming' : now < end ? 'active' : 'expired');
       urgent = { quest: todayQuest, start, end, status };
@@ -210,11 +217,11 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
       const day = addDays(today, i);
       const q = urgentFor(day);
       if (!q || urgentAnswers.has(day)) continue;
-      const at = urgentWindow(q).start.getTime();
+      const at = urgentWindow(q, state.modifiers.urgentMinutes).start.getTime();
       if (at > now.getTime()) urgentSchedule.push({ at, text: q.text });
     }
 
-    const storeItems = storeRows.map((r) => ({ id: r.id, name: r.name, cost: r.cost }));
+    const storeItems: StoreItem[] = storeRows.map((r) => ({ id: r.id, name: r.name, cost: r.cost, kind: r.kind === 'unlock' ? 'unlock' : 'treat' }));
     const itemNames = new Map(storeRows.map((r) => [r.id, r.name]));
     const purchases: PurchaseRecord[] = parsedPurchases
       .map((p) => ({
@@ -252,7 +259,7 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
       },
       today,
       now,
-      unseenFailures: state.history.filter((d) => (d.kind === 'slip' || d.kind === 'failure') && unseen.has(d.day)),
+      unseenFailures: state.history.filter((d) => (d.kind === 'slip' || d.kind === 'failure') && !d.graced && unseen.has(d.day)),
       storeItems,
       purchases,
       activeSurvival: activeSurvival ?? null,
@@ -260,7 +267,7 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
       seen: new Set(eventRows.filter((e) => e.kind === 'seen').map((e) => e.ref)),
       urgent,
       urgentSchedule,
-      classQuests,
+      mainQuests,
     };
   }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows, now]);
 

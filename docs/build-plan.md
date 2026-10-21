@@ -150,6 +150,14 @@ Also shipped in this round: app icon and splash, Awakening onboarding, history c
 - **Class Quests** (graded step chains or counted goals, no time limit) and the Job Change (level 10, 3-day trial, job from your top stats).
 - Effects of items, titles and jobs apply only from the day they're equipped, never retroactively. No server migration needed (uses existing events and class_quests).
 
+### Phase 5.5: Main Quests & reward redesign ✅
+- **Main Quests**: goals split into chapters of Learn / Practice / Build quests, each chapter ending with a Boss. Chapters open in order; a one-line "what I learned" note on clear; a linked daily habit shows its days and totals; outline paste. Phase 5 Class Quests read as one-chapter quests.
+- **Economy v2**: gold measures days of effort (about 100 G per kept day, scaled by difficulty, not by quest count), so Store prices read as days. Starts from the update day; earlier gold is untouched. Shields cost 5 days and you hold at most 2. Random boxes removed (nothing random is sold).
+- **Gear that changes the rules** (forgiven slips, better Minimum Clears, cheaper Rest Days, longer Urgent Quests, Critical chance) and **the Forge** (3 items → 1 of the next rarity, result previewed). Unique+ drops carry gear.
+- **Shadow Army**: mastered quests rise as named, ranked Shadows. **Hunter's Record**: real-world totals, last 30 vs previous 30 days, personal bests, milestone titles.
+- **Unlocks** (free permissions when the Daily Quest is kept) and **Bounties** (real rewards committed in advance to a chapter or quest).
+- Grounded in the research in docs/behavior-design.md: informational over controlling rewards, visible progress, goal gradient, experiential rewards, temptation bundling. No server migration needed.
+
 ### Phase 6: Android extras (2–3 days)
 - Home-screen widget showing today's quests.
 - "Mark done" action straight from the notification.

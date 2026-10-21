@@ -19,6 +19,8 @@ import {
   GATE_REWARD,
   gateItem,
   type GateState,
+  hash,
+  SHADOW_NAMES,
   type Habit,
   IDENTITY_TITLES,
   niceTarget,
@@ -213,6 +215,9 @@ export function MasteryCard({ habit }: { habit: Habit }) {
         <SysText style={styles.line}>· Permanent +{PASSIVE_STAT_BONUS} {habit.stat}.</SysText>
         <SysText style={styles.line}>· Half EXP per clear: take on a new challenge.</SysText>
         <SysText style={styles.line}>· If neglected it weakens and reminders return.</SysText>
+        <SysText style={[styles.line, { color: colors.epic }]}>
+          · It rises as {SHADOW_NAMES[hash(habit.id) % SHADOW_NAMES.length]}, a Shadow in your army.
+        </SysText>
       </View>
       <SysText variant="label" style={{ fontSize: 12 }}>
         SKILL NAME
@@ -222,7 +227,7 @@ export function MasteryCard({ habit }: { habit: Habit }) {
         TITLE EARNED
       </SysText>
       <TextInput value={title} onChangeText={setTitle} style={styles.input} accessibilityLabel="Title earned" />
-      <SysButton label="ACCEPT PASSIVE SKILL" onPress={accept} />
+      <SysButton label="ARISE" onPress={accept} />
       <SysButton label="NOT YET" variant="ghost" onPress={() => recordDecision(habit.id, 'mastery', false)} />
     </SystemWindow>
   );

@@ -78,8 +78,9 @@ export const SYSTEM_ITEMS = {
   shield: {
     name: 'Streak Shield',
     description: 'Absorbs one failed day: no penalty, streak kept. Used automatically.',
-    cost: 1000,
+    cost: 500,
   },
+  // No longer sold; kept so past purchases still read correctly.
   blessed_box: { name: 'Blessed Random Box', description: 'Contains a reward you want, from your list.', cost: 600 },
   cursed_box: { name: 'Cursed Random Box', description: 'Contains an item you need.', cost: 200 },
 } as const;
@@ -197,9 +198,58 @@ export const URGENT_POOL: { id: string; text: string; stat: Stat }[] = [
   { id: 'message', text: 'Send a kind message to someone', stat: 'SENSE' },
 ];
 
-/** Class Quests (long-term goal chains): EXP per step is GOAL_XP[grade] × this, plus a completion bonus. */
-export const CLASS_STEP_XP_MULT = 5;
-export const CLASS_COMPLETE_XP = 300;
+// ---------- Main Quests (docs/build-plan.md, Phase 5.5) ----------
+
+/** EXP per quest is GOAL_XP[grade] × this, by type. A chapter Boss uses BOSS_XP_MULT. */
+export const TASK_XP_MULT = { learn: 2, practice: 3, build: 4 } as const;
+export const BOSS_XP_MULT = 5;
+export const TASK_GOLD = 20;
+export const BOSS_GOLD = 100;
+/** Finishing a Main Quest with several chapters; a one-chapter quest pays the smaller bonus. */
+export const MAIN_QUEST_COMPLETE_XP = 1000;
+export const SHORT_QUEST_COMPLETE_XP = 300;
+/** Permanent bonus to the Main Quest's stat when a multi-chapter quest is finished. */
+export const MAIN_QUEST_STAT_BONUS = 2;
+
+// ---------- economy v2: gold measures days of effort ----------
+
+/** A fully kept day earns this, adjusted by how hard the day's quests are. */
+export const DAY_GOLD = 100;
+/** Share of DAY_GOLD for a Minimum Clear day, and for the done part of a missed day. */
+export const MIN_DAY_GOLD_SHARE = 0.4;
+export const MISSED_DAY_GOLD_SHARE = 0.5;
+/** Difficulty factor = average GOAL_XP of the day's quests ÷ this, clamped. */
+export const DAY_GOLD_BASE_XP = 50;
+export const DAY_GOLD_FACTOR_RANGE = [0.6, 1.4] as const;
+export const GATE_GOLD_V2 = 200;
+export const URGENT_GOLD_V2 = 20;
+/** Gold drops are small; Unique and Legendary drops also carry a piece of gear. */
+export const DROP_GOLD_V2: Record<Rarity, number> = { Normal: 10, Rare: 25, Epic: 50, Unique: 125, Legendary: 300 };
+/** Shields you can hold at once; a Shield found at the cap becomes gold instead. */
+export const SHIELD_CAP = 2;
+export const SHIELD_OVERFLOW_GOLD = 100;
+
+// ---------- Shadow Army & Hunter's Record ----------
+
+/** Names for extracted Shadows (picked from the habit id, so a Shadow keeps its name). */
+export const SHADOW_NAMES = ['Vael', 'Korran', 'Sable', 'Morrow', 'Ashka', 'Tarn', 'Ilse', 'Varek', 'Nyx', 'Oren', 'Kestrel', 'Draven'];
+/** Shadow rank by habit strength (highest first). Below the weakened line it fades. */
+export const SHADOW_RANKS: { min: number; rank: string }[] = [
+  { min: 95, rank: 'Marshal' },
+  { min: 90, rank: 'Commander' },
+  { min: 80, rank: 'Knight' },
+  { min: 70, rank: 'Elite' },
+  { min: 0, rank: 'Soldier' },
+];
+/** Lifetime totals, as multiples of the daily target, that earn a Record title. */
+export const RECORD_MILESTONES: { times: number; tier: string }[] = [
+  { times: 10, tier: 'Initiate' },
+  { times: 50, tier: 'Adept' },
+  { times: 100, tier: 'Veteran' },
+  { times: 250, tier: 'Master' },
+  { times: 500, tier: 'Grandmaster' },
+  { times: 1000, tier: 'Legend' },
+];
 
 /** Every stat starts here. */
 export const BASE_STAT = 10;

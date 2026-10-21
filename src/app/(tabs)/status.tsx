@@ -5,14 +5,14 @@ import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { EquipmentWindow, HiddenStatsWindow } from '@/components/overgeared';
+import { EquipmentWindow, HiddenStatsWindow, ShadowArmyWindow } from '@/components/overgeared';
 import { ProgressBar } from '@/components/progress-bar';
-import { HabitStrengthWindow, PassiveSkillsWindow, TitlePicker } from '@/components/strength-panel';
+import { HabitStrengthWindow, TitlePicker } from '@/components/strength-panel';
 import { SysButton } from '@/components/sys-button';
 import { SysText } from '@/components/sys-text';
 import { SystemWindow } from '@/components/system-window';
 import { activateSkill, allocatePoint, cancelSkillToday } from '@/db/actions';
-import { RANK_MIN_LEVEL, RANKS, SKILLS, type Stat, STAT_INFO, STATS } from '@/engine';
+import { RANK_MIN_LEVEL, RANKS, SHIELD_CAP, SKILLS, type Stat, STAT_INFO, STATS } from '@/engine';
 import { usePlayerState } from '@/hooks/use-player-state';
 import { playSound } from '@/sound';
 import { colors, fonts } from '@/theme';
@@ -42,7 +42,7 @@ export default function StatusScreen() {
       ]);
       return;
     }
-    Alert.alert(`Use ${SKILLS.rest_day.name}?`, `${SKILLS.rest_day.description}\n\nCosts ${SKILLS.rest_day.mpCost} MP.`, [
+    Alert.alert(`Use ${SKILLS.rest_day.name}?`, `${SKILLS.rest_day.description}\n\nCosts ${state.restCost} MP.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Use skill',
@@ -60,6 +60,7 @@ export default function StatusScreen() {
         <View style={styles.topBar}>
           <SysText variant="caption">{state.streak}-day streak</SysText>
           <View style={{ flexDirection: 'row' }}>
+            <IconButton icon="book-open-page-variant-outline" label="Hunter's Record" onPress={() => router.push('/record')} />
             <IconButton icon="trophy-outline" label="Achievements" onPress={() => router.push('/achievements')} />
             <IconButton icon="calendar-month-outline" label="History" onPress={() => router.push('/history')} />
             <IconButton icon="cog-outline" label="Settings" onPress={() => router.push('/settings')} />
@@ -134,7 +135,7 @@ export default function StatusScreen() {
         </SystemWindow>
 
         <EquipmentWindow player={player} />
-        <PassiveSkillsWindow player={player} />
+        <ShadowArmyWindow player={player} />
         <HabitStrengthWindow player={player} />
         <HiddenStatsWindow player={player} />
 
@@ -143,7 +144,7 @@ export default function StatusScreen() {
             <MaterialCommunityIcons name="weather-night" size={26} color={rest.unlocked ? colors.epic : colors.textDone} />
             <View style={{ flex: 1, gap: 2 }}>
               <SysText style={{ fontFamily: fonts.bodySemi, fontSize: 15, color: rest.unlocked ? colors.text : colors.textDone }}>
-                {SKILLS.rest_day.name} · {SKILLS.rest_day.mpCost} MP
+                {SKILLS.rest_day.name} · {state.restCost} MP
               </SysText>
               <SysText variant="caption" style={{ fontSize: 12, lineHeight: 17 }}>
                 {rest.unlocked ? SKILLS.rest_day.description : `Unlocks at level ${SKILLS.rest_day.unlockLevel}.`}
@@ -152,7 +153,7 @@ export default function StatusScreen() {
           </View>
           {rest.unlocked ? (
             <SysButton
-              label={rest.activeToday ? 'ACTIVE TODAY · CANCEL' : state.mp < SKILLS.rest_day.mpCost ? 'NOT ENOUGH MP' : 'USE TODAY'}
+              label={rest.activeToday ? 'ACTIVE TODAY · CANCEL' : state.mp < state.restCost ? 'NOT ENOUGH MP' : 'USE TODAY'}
               variant={rest.activeToday ? 'ghost' : 'primary'}
               disabled={!rest.activeToday && !rest.canUse}
               onPress={toggleRest}
@@ -163,7 +164,7 @@ export default function StatusScreen() {
             <View style={{ flex: 1, gap: 2 }}>
               <SysText style={{ fontFamily: fonts.bodySemi, fontSize: 15, color: colors.text }}>Streak Shields · {state.shields}</SysText>
               <SysText variant="caption" style={{ fontSize: 12, lineHeight: 17 }}>
-                Used automatically on a failed day. Buy them in the Store.
+                Used automatically on a failed day. Hold up to {SHIELD_CAP}; buy them in the Store.
               </SysText>
             </View>
           </View>
@@ -174,7 +175,7 @@ export default function StatusScreen() {
   );
 }
 
-function IconButton({ icon, label, onPress }: { icon: 'cog-outline' | 'calendar-month-outline' | 'trophy-outline'; label: string; onPress: () => void }) {
+function IconButton({ icon, label, onPress }: { icon: 'cog-outline' | 'calendar-month-outline' | 'trophy-outline' | 'book-open-page-variant-outline'; label: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={6} style={styles.iconBtn}>
       <MaterialCommunityIcons name={icon} size={22} color={colors.textMuted} />

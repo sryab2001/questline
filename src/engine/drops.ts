@@ -18,6 +18,9 @@ export interface Drop {
   rarity: Rarity;
   type: DropType;
   amount: number;
+  /** Gear that came with the drop (economy v2, Unique and Legendary). */
+  itemId?: string;
+  itemName?: string;
 }
 
 const TYPE_WEIGHTS: Record<Rarity, Record<DropType, number>> = {
@@ -52,12 +55,17 @@ export function urgentDrop(day: DayKey): Drop | null {
   return roll('urgent', `urgentdrop:${day}`, URGENT_DROP_CHANCE);
 }
 
-/** Critical Clear: double EXP for this quest today. */
-export function isCritical(habitId: string, day: DayKey): boolean {
-  return seededRng(`crit:${habitId}:${day}`)() < CRITICAL_CHANCE;
+/** Critical Clear: double EXP for this quest today. Gear can add percentage points of chance. */
+export function isCritical(habitId: string, day: DayKey, extraPct = 0): boolean {
+  return seededRng(`crit:${habitId}:${day}`)() < CRITICAL_CHANCE + extraPct / 100;
 }
 
 export function describeDrop(d: Drop): string {
+  const base = describeDropContents(d);
+  return d.itemName ? `${base} + ${d.itemName}` : base;
+}
+
+function describeDropContents(d: Drop): string {
   switch (d.type) {
     case 'gold':
       return `Gold Pouch (+${d.amount} G)`;

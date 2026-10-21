@@ -1,6 +1,7 @@
 import type { DayKey } from './day';
 import type { Drop } from './drops';
 import type { Item, Modifiers, Slot } from './items';
+import type { MainQuestInput } from './main-quests';
 import type { Grade, Rank, SkillId, Stat } from './rules';
 
 /** `daily`, or a comma-separated list of weekdays (0 = Sunday), e.g. "1,3,5". */
@@ -100,13 +101,6 @@ export interface OfferDecision {
   accepted?: boolean;
 }
 
-/** A long-term goal chain. Steps are done in order; each records the day it was done. */
-export interface ClassQuestInput {
-  id: string;
-  name: string;
-  steps: { title: string; grade: Grade; doneDay: DayKey | null }[];
-}
-
 export interface EngineInput {
   habits: Habit[];
   logs: LogEntry[];
@@ -130,7 +124,11 @@ export interface EngineInput {
   jobChanges?: { jobId: string; day: DayKey }[];
   /** Days the Job Change trial was (re)started. */
   jobTrials?: { day: DayKey }[];
-  classQuests?: ClassQuestInput[];
+  mainQuests?: MainQuestInput[];
+  /** Forge uses in creation order: three same-rarity items become one of the next rarity. */
+  forges?: { day: DayKey; inputs: string[] }[];
+  /** First day of economy v2 (gold per kept day). Earlier days keep the old per-quest gold. */
+  economyFrom?: DayKey | null;
 }
 
 export interface GoalProgress {
@@ -188,6 +186,8 @@ export interface DaySummary {
   urgent: boolean;
   /** This day completed the week's Gate. */
   gateCleared: boolean;
+  /** A slip forgiven by gear: no penalty, and it doesn't set up a Failure. */
+  graced: boolean;
 }
 
 export interface AchievementState {
@@ -223,16 +223,76 @@ export interface JobChangeState {
   options: { id: string; name: string; stat: Stat; description: string }[];
 }
 
-export interface ClassQuestState {
+export interface ChapterState {
+  title: string;
+  done: number;
+  total: number;
+  cleared: boolean;
+  clearedDay: DayKey | null;
+  /** Open to work on: every earlier chapter is cleared. */
+  unlocked: boolean;
+  /** Item for clearing the chapter (multi-chapter quests only). */
+  reward: Item | null;
+}
+
+export interface MainQuestState {
   id: string;
   name: string;
+  chapters: ChapterState[];
+  current: number;
   done: number;
   total: number;
   complete: boolean;
   completedDay: DayKey | null;
-  /** What finishing it awards (the same item every time). */
+  /** What finishing the quest awards. */
   reward: Item;
-  xpPerStep: number[];
+  completeXp: number;
+  title: string | null;
+}
+
+/** A mastered habit, extracted as a Shadow (Solo Leveling's "Arise"). */
+export interface Shadow {
+  habitId: string;
+  name: string;
+  habitName: string;
+  stat: Stat;
+  rank: string;
+  strength: number;
+  extractedDay: DayKey | null;
+  /** Habit strength fell below the weakened line: the Shadow fades until it recovers. */
+  faded: boolean;
+}
+
+export interface HabitRecord {
+  habitId: string;
+  name: string;
+  unit: string;
+  target: number;
+  /** Sum of everything logged (days kept, for yes/no quests). */
+  total: number;
+  daysDone: number;
+  bestDay: number;
+  last30: number;
+  prev30: number;
+}
+
+export interface RecordMilestone {
+  habitId: string;
+  /** Multiple of the daily target reached in total (10, 50, 100, …). */
+  times: number;
+  title: string;
+  amount: number;
+  reachedDay: DayKey;
+}
+
+export interface HunterRecord {
+  habits: HabitRecord[];
+  milestones: RecordMilestone[];
+  longestStreak: number;
+  bestWeek: number;
+  keptLast30: number;
+  keptPrev30: number;
+  totalKept: number;
 }
 
 export interface HabitStat {
@@ -310,7 +370,15 @@ export interface PlayerState {
   modifiers: Modifiers;
   hiddenStats: HiddenStats;
   jobChange: JobChangeState;
-  classQuests: ClassQuestState[];
+  mainQuests: MainQuestState[];
+  shadows: Shadow[];
+  record: HunterRecord;
+  /** Items used up in the Forge are gone from the inventory. */
+  forgedCount: number;
+  /** Economy v2 is in force today (gold per kept day). */
+  economyV2: boolean;
+  /** Rest Day MP cost today after gear discounts. */
+  restCost: number;
   today: {
     goals: GoalProgress[];
     cleared: number;

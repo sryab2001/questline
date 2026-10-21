@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { JOB_CHANGE_LEVEL, JOB_TRIAL_DAYS } from './achievements';
 import { dayRange } from './day';
-import { classQuestRarity, gateItem, makeItem } from './items';
-import { BASE_STAT, CLASS_COMPLETE_XP, CLASS_STEP_XP_MULT, GATE_REWARD, GOAL_XP } from './rules';
+import { chainRarity, gateItem, makeItem } from './items';
+import { BASE_STAT, GATE_REWARD } from './rules';
 import { computeState, daysToClose, evaluateDay } from './state';
 import type { EngineInput, Habit, LogEntry } from './types';
 
@@ -37,11 +37,11 @@ describe('items', () => {
     expect((value('Legendary') as { value: number }).value).toBeGreaterThan((value('Normal') as { value: number }).value);
   });
 
-  it('Class Quest rewards scale with chain length', () => {
-    expect(classQuestRarity(2)).toBe('Normal');
-    expect(classQuestRarity(3)).toBe('Rare');
-    expect(classQuestRarity(5)).toBe('Epic');
-    expect(classQuestRarity(9)).toBe('Legendary');
+  it('one-chapter quest rewards scale with its length', () => {
+    expect(chainRarity(2)).toBe('Normal');
+    expect(chainRarity(3)).toBe('Rare');
+    expect(chainRarity(5)).toBe('Epic');
+    expect(chainRarity(9)).toBe('Legendary');
   });
 });
 
@@ -143,34 +143,6 @@ describe('Job Change', () => {
     expect(d(knight, '2026-10-14')).toBe(d(base, '2026-10-14'));
     expect(d(knight, '2026-10-16')).toBeGreaterThan(d(base, '2026-10-16'));
     expect(knight.achievements.find((a) => a.id === 'job_change')!.unlockedDay).toBe('2026-10-15');
-  });
-});
-
-describe('Class Quests', () => {
-  it('pay EXP per step on the day it is done, and a bonus, item and achievement on completion', () => {
-    const quest = {
-      id: 'cq1',
-      name: 'Path of the Runner',
-      steps: [
-        { title: 'First 5K', grade: 'D' as const, doneDay: '2026-10-03' },
-        { title: 'First 10K', grade: 'B' as const, doneDay: '2026-10-08' },
-        { title: 'Half marathon', grade: 'S' as const, doneDay: '2026-10-12' },
-      ],
-    };
-    const base = run([], [], '2026-10-20');
-    const s = run([], [], '2026-10-20', { classQuests: [quest] });
-    const stepXp = (GOAL_XP.D + GOAL_XP.B + GOAL_XP.S) * CLASS_STEP_XP_MULT;
-    expect(s.totalXp - base.totalXp).toBe(stepXp + CLASS_COMPLETE_XP);
-    expect(s.classQuests[0]).toMatchObject({ done: 3, total: 3, complete: true, completedDay: '2026-10-12' });
-    expect(s.inventory.find((i) => i.id === 'class:cq1')).toMatchObject({ rarity: 'Rare', obtainedDay: '2026-10-12' });
-    expect(s.achievements.find((a) => a.id === 'path_walker')!.unlockedDay).toBe('2026-10-12');
-  });
-
-  it('track partial progress', () => {
-    const s = run([], [], '2026-10-20', {
-      classQuests: [{ id: 'cq2', name: 'Read 12 books', steps: [{ title: '1', grade: 'E', doneDay: '2026-10-02' }, { title: '2', grade: 'E', doneDay: null }] }],
-    });
-    expect(s.classQuests[0]).toMatchObject({ done: 1, total: 2, complete: false });
   });
 });
 

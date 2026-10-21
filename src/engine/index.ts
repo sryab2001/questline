@@ -10,3 +10,4 @@ export * from './random';
 export * from './urgent';
 export * from './achievements';
 export * from './items';
+export * from './main-quests';

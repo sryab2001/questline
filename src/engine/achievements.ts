@@ -16,6 +16,7 @@ export interface Progress {
   level: number;
   jobChanged: number;
   classQuestsDone: number;
+  forged: number;
 }
 
 export interface AchievementDef {
@@ -46,7 +47,9 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'fortune', title: 'Blessed by Fortune', description: 'Receive a Legendary drop.', metric: 'legendaryDrops', target: 1, titleEffect: { kind: 'gold_pct', value: 10 } },
   { id: 'rank_d', title: 'D-Rank Hunter', description: 'Reach level 20.', metric: 'level', target: 20, allStats: 1, titleEffect: { kind: 'xp_pct', value: 3 } },
   { id: 'job_change', title: 'Reborn', description: 'Complete the Job Change.', metric: 'jobChanged', target: 1, titleEffect: { kind: 'xp_pct', value: 3 } },
-  { id: 'path_walker', title: 'Path Walker', description: 'Complete a Class Quest.', metric: 'classQuestsDone', target: 1, titleEffect: { kind: 'xp_pct', value: 5 } },
+  { id: 'path_walker', title: 'Path Walker', description: 'Complete a Main Quest.', metric: 'classQuestsDone', target: 1, titleEffect: { kind: 'xp_pct', value: 5 } },
+  { id: 'blacksmith', title: 'Blacksmith', description: 'Forge your first item.', metric: 'forged', target: 1, item: 'Rare', titleEffect: { kind: 'min_clear_pct', value: 10 } },
+  { id: 'shadow_monarch', title: 'Shadow Monarch', description: 'Extract 3 Shadows: master three quests.', metric: 'masteries', target: 3, allStats: 2, item: 'Legendary', titleEffect: { kind: 'grace_slip', value: 1 } },
 ];
 
 export const ACHIEVEMENT_BY_TITLE = new Map(ACHIEVEMENTS.map((a) => [a.title, a]));

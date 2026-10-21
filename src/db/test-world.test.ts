@@ -8,7 +8,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { drizzle } from 'drizzle-orm/sqlite-proxy';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { computeState, type PlayerState } from '@/engine';
+import { computeState, parseMainQuest, type PlayerState } from '@/engine';
 
 import * as schema from './schema';
 
@@ -71,7 +71,9 @@ beforeAll(async () => {
     titleChanges: events.filter((e) => e.kind === 'title').map((e) => ({ title: e.ref, day: e.day })),
     jobChanges: [],
     jobTrials: events.filter((e) => e.kind === 'job_trial').map((e) => ({ day: e.day })),
-    classQuests: classQuests.map((q) => ({ id: q.id, name: q.name, steps: JSON.parse(q.stepsJson) })),
+    mainQuests: classQuests.map((q) => ({ id: q.id, name: q.name, data: parseMainQuest(q.stepsJson) })),
+    forges: [],
+    economyFrom: events.find((e) => e.kind === 'economy')?.day ?? null,
     surprises: true,
     urgentCleared: [],
   });
@@ -80,12 +82,23 @@ beforeAll(async () => {
 describe('Test World seed', () => {
   it('builds a mid-game player', () => {
     if (process.env.SHOW_TEST_WORLD) {
-      const { level, rank, gold, streak, hp, maxHp, inventory, achievements, stats } = state;
-      console.log({ level, rank, gold, streak, hp: `${hp}/${maxHp}`, items: inventory.map((i) => `${i.rarity} ${i.name}`), achievements: achievements.filter((a) => a.unlockedDay).map((a) => a.title), stats });
+      const { level, rank, gold, streak, hp, maxHp, inventory, achievements, stats, shadows, record } = state;
+      console.log({
+        level,
+        rank,
+        gold,
+        streak,
+        hp: `${hp}/${maxHp}`,
+        items: inventory.map((i) => `${i.rarity} ${i.name}`),
+        achievements: achievements.filter((a) => a.unlockedDay).map((a) => a.title),
+        stats,
+        shadows: shadows.map((s) => `${s.name} (${s.rank}) of ${s.habitName}`),
+        milestones: record.milestones.map((m) => m.title),
+      });
     }
     expect(state.level).toBeGreaterThanOrEqual(12);
-    // Days 40–41 are a slip then a failure, unless a dropped Streak Shield absorbs it.
-    expect(state.history.filter((d) => d.kind === 'failure' || d.kind === 'shielded')).toHaveLength(1);
+    // Days 40–41 are a slip then a failure, unless a Streak Shield absorbs it or gear forgives the slip.
+    expect(state.history.filter((d) => d.kind === 'failure' || d.kind === 'shielded').length).toBeLessThanOrEqual(1);
     expect(state.history.filter((d) => d.kind === 'slip').length).toBeGreaterThanOrEqual(3);
     expect(state.streak).toBeGreaterThan(14);
   });
@@ -107,8 +120,24 @@ describe('Test World seed', () => {
     expect(state.activeTitle).toBe('The Persistent');
   });
 
-  it('has class quests in progress and gold to spend', () => {
-    expect(state.classQuests.map((q) => `${q.done}/${q.total}`)).toEqual(['2/3', '0/1', '1/4']);
-    expect(state.gold).toBeGreaterThan(2000);
+  it('has Main Quests in progress, Shadows and a Record', () => {
+    expect(state.mainQuests.map((q) => `${q.done}/${q.total}`)).toEqual(['7/16', '2/3', '0/1']);
+    expect(state.mainQuests[0]).toMatchObject({ current: 1, complete: false, title: 'Machine Mind Scholar' });
+    expect(state.mainQuests[0].chapters.map((c) => [c.cleared, c.unlocked])).toEqual([
+      [true, true],
+      [false, true],
+      [false, false],
+      [false, false],
+    ]);
+    expect(state.inventory.map((i) => i.id)).toContain(state.mainQuests[0].chapters[0].reward!.id);
+    expect(state.shadows.map((s) => s.habitName)).toEqual(['Read']);
+    expect(state.record.milestones.length).toBeGreaterThan(0);
+  });
+
+  it('keeps gold at days-of-effort scale', () => {
+    // ~80 kept days at ~70 G plus Gates: thousands, not the 33k of the old per-quest economy.
+    expect(state.economyV2).toBe(true);
+    expect(state.gold).toBeGreaterThan(4000);
+    expect(state.gold).toBeLessThan(12000);
   });
 });

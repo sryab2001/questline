@@ -8,7 +8,9 @@ import {
   evaluateDay,
   type Grade,
   GRADES,
+  currentChapter,
   type Habit,
+  type MainQuestData,
   type OfferKind,
   type QuestOffer,
   type Slot,
@@ -240,14 +242,19 @@ export async function acknowledgeDays(days: string[]) {
 
 // ---------- store ----------
 
-export async function addStoreItem(name: string, cost: number) {
-  await db.insert(storeItems).values({ id: uuidv7(), ...stamps(), name: name.trim(), cost: Math.round(cost), kind: 'treat' });
+/** A treat bought with gold, or an unlock: a free permission once the Daily Quest is kept. */
+export type RewardKind = 'treat' | 'unlock';
+
+export async function addStoreItem(name: string, cost: number, kind: RewardKind = 'treat') {
+  await db
+    .insert(storeItems)
+    .values({ id: uuidv7(), ...stamps(), name: name.trim(), cost: kind === 'unlock' ? 0 : Math.round(cost), kind });
 }
 
-export async function updateStoreItem(id: string, name: string, cost: number) {
+export async function updateStoreItem(id: string, name: string, cost: number, kind: RewardKind = 'treat') {
   await db
     .update(storeItems)
-    .set({ name: name.trim(), cost: Math.round(cost), ...touched() })
+    .set({ name: name.trim(), cost: kind === 'unlock' ? 0 : Math.round(cost), kind, ...touched() })
     .where(eq(storeItems.id, id));
 }
 
@@ -396,67 +403,81 @@ export async function chooseJob(jobId: string) {
   await addEvent('job', jobId);
 }
 
-/** A Class Quest step. A counter step (target) completes when count reaches target. */
-export interface ClassStep {
-  title: string;
-  grade: Grade;
-  target?: number | null;
-  count?: number;
-  doneDay: string | null;
+// ---------- Main Quests ----------
+
+function questValues(name: string, data: MainQuestData) {
+  const current = currentChapter(data);
+  return {
+    name: name.trim(),
+    rating: '',
+    stepsJson: JSON.stringify(data),
+    currentStep: current,
+    status: current >= data.chapters.length && data.chapters.length > 0 ? ('cleared' as const) : ('active' as const),
+  };
 }
 
-export async function saveClassQuest(id: string | null, name: string, steps: ClassStep[]) {
-  const values = { name: name.trim(), rating: '', stepsJson: JSON.stringify(steps), currentStep: steps.findIndex((s) => !s.doneDay) };
+export async function saveMainQuest(id: string | null, name: string, data: MainQuestData) {
   if (id) {
-    await db.update(classQuests).set({ ...values, ...touched() }).where(eq(classQuests.id, id));
+    await db.update(classQuests).set({ ...questValues(name, data), ...touched() }).where(eq(classQuests.id, id));
   } else {
-    await db.insert(classQuests).values({ id: uuidv7(), ...stamps(), ...values, status: 'active' });
+    await db.insert(classQuests).values({ id: uuidv7(), ...stamps(), ...questValues(name, data) });
   }
 }
 
-export async function deleteClassQuest(id: string) {
+export async function deleteMainQuest(id: string) {
   await db.update(classQuests).set({ deletedAt: new Date(), ...touched() }).where(eq(classQuests.id, id));
 }
 
-/** Advances the current step: +1 on a counter step, or marks a plain step done today. */
-export async function advanceClassQuest(id: string, steps: ClassStep[]) {
-  const i = steps.findIndex((s) => !s.doneDay);
-  if (i < 0) return;
-  const day = await todayKey();
-  const next = steps.map((s) => ({ ...s }));
-  const st = next[i];
-  if (st.target && st.target > 1) {
-    st.count = (st.count ?? 0) + 1;
-    if (st.count >= st.target) st.doneDay = day;
-  } else {
-    st.doneDay = day;
+/**
+ * Progress on one quest of a Main Quest: "advance" adds one to a counted quest or
+ * clears it today; "undo" reopens a cleared quest or takes one count off. A note
+ * ("what I learned") can be saved with a clear.
+ */
+export async function updateQuestTask(
+  id: string,
+  name: string,
+  data: MainQuestData,
+  ci: number,
+  ti: number,
+  op: 'advance' | 'undo',
+  note?: string,
+) {
+  const next: MainQuestData = { ...data, chapters: data.chapters.map((c) => ({ ...c, tasks: c.tasks.map((t) => ({ ...t })) })) };
+  const t = next.chapters[ci]?.tasks[ti];
+  if (!t) return;
+  if (op === 'advance') {
+    if (t.doneDay) return;
+    if (t.target && t.target > 1) {
+      t.count = (t.count ?? 0) + 1;
+      if (t.count >= t.target) t.doneDay = await todayKey();
+    } else {
+      t.doneDay = await todayKey();
+    }
+    if (note?.trim()) t.note = note.trim();
+  } else if (t.doneDay) {
+    t.doneDay = null;
+    if (t.target && t.target > 1) t.count = t.target - 1;
+  } else if ((t.count ?? 0) > 0) {
+    t.count = (t.count ?? 0) - 1;
   }
-  const done = next.every((s) => s.doneDay);
-  await db
-    .update(classQuests)
-    .set({ stepsJson: JSON.stringify(next), currentStep: done ? next.length : i, status: done ? 'cleared' : 'active', ...touched() })
-    .where(eq(classQuests.id, id));
+  await db.update(classQuests).set({ ...questValues(name, next), ...touched() }).where(eq(classQuests.id, id));
 }
 
-/** Undoes the most recent progress (last done step, or one count). */
-export async function undoClassQuest(id: string, steps: ClassStep[]) {
-  const next = steps.map((s) => ({ ...s }));
-  const open = next.findIndex((s) => !s.doneDay);
-  const current = open >= 0 ? next[open] : null;
-  if (current?.target && (current.count ?? 0) > 0) {
-    // Take one count off the step in progress.
-    current.count = (current.count ?? 0) - 1;
-  } else {
-    // Reopen the last finished step (a counter step goes back to one short of its target).
-    const last = (open >= 0 ? open : next.length) - 1;
-    if (last < 0) return;
-    next[last].doneDay = null;
-    if (next[last].target) next[last].count = Math.max(0, (next[last].target ?? 1) - 1);
-  }
-  await db
-    .update(classQuests)
-    .set({ stepsJson: JSON.stringify(next), currentStep: next.findIndex((s) => !s.doneDay), status: 'active', ...touched() })
-    .where(eq(classQuests.id, id));
+// ---------- rewards ----------
+
+/** Forges three same-rarity items into one of the next rarity (checked by the engine). */
+export async function forgeItems(inputs: string[]) {
+  await addEvent('forge', 'forge', { inputs });
+}
+
+/** Starts economy v2 (gold per kept day) today, once. Earlier days keep their gold. */
+export async function ensureEconomyV2() {
+  const existing = await db
+    .select({ id: events.id })
+    .from(events)
+    .where(and(eq(events.kind, 'economy'), isNull(events.deletedAt)))
+    .limit(1);
+  if (existing.length === 0) await addEvent('economy', 'v2');
 }
 
 // ---------- dev tools ----------

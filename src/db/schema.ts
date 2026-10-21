@@ -99,7 +99,7 @@ export const storeItems = sqliteTable('store_items', {
   ...syncColumns,
   name: text('name').notNull(),
   cost: integer('cost').notNull(),
-  kind: text('kind', { enum: ['treat', 'shield', 'box'] }).notNull(),
+  kind: text('kind', { enum: ['treat', 'shield', 'box', 'unlock'] }).notNull(),
 });
 
 export const purchases = sqliteTable('purchases', {

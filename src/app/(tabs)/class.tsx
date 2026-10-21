@@ -1,24 +1,26 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { RARITY_COLOR } from '@/components/gain-toast';
+import { ItemLine } from '@/components/overgeared';
 import { ProgressBar } from '@/components/progress-bar';
 import { SysButton } from '@/components/sys-button';
 import { SysText } from '@/components/sys-text';
 import { SystemWindow } from '@/components/system-window';
-import { advanceClassQuest, chooseJob, startJobTrial, undoClassQuest } from '@/db/actions';
-import { describeEffect } from '@/engine';
-import { type ClassQuestRow, type PlayerData, usePlayerState } from '@/hooks/use-player-state';
+import { TASK_ICON } from '@/components/task-icon';
+import { chooseJob, startJobTrial, updateQuestTask } from '@/db/actions';
+import { type QuestTask, taskOpen, taskXp } from '@/engine';
+import { type MainQuestRow, type PlayerData, usePlayerState } from '@/hooks/use-player-state';
 import { playSound } from '@/sound';
 import { colors, fonts } from '@/theme';
 
 export default function ClassScreen() {
   const player = usePlayerState();
   if (!player) return null;
-  const quests = player.classQuests;
+  const quests = player.mainQuests;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -26,22 +28,22 @@ export default function ClassScreen() {
         <JobChangeWindow player={player} />
 
         <View style={styles.sectionHead}>
-          <SysText variant="label">CLASS &amp; MAIN QUESTS</SysText>
+          <SysText variant="label">MAIN QUESTS</SysText>
           <SysText variant="caption">No time limit</SysText>
         </View>
 
         {quests.length === 0 ? (
-          <SystemWindow title="CLASS QUEST" variant="epic">
+          <SystemWindow title="MAIN QUEST" variant="epic">
             <SysText style={{ textAlign: 'center', lineHeight: 21 }}>
-              Turn a long-term goal into a chain of graded steps (&quot;Run 5 km → 10 km → half marathon&quot;) or a single
-              counted goal (&quot;Read 12 books&quot;). Finishing one awards a rated item.
+              Turn a big goal (&quot;Learn GenAI&quot;, &quot;Run a half marathon&quot;) into chapters of small quests. Each chapter ends
+              with a Boss: build or prove what you learned.
             </SysText>
           </SystemWindow>
         ) : (
-          quests.map((q) => <ClassQuestCard key={q.id} quest={q} player={player} />)
+          quests.map((q) => <MainQuestCard key={q.id} quest={q} player={player} />)
         )}
 
-        <SysButton label="+ NEW CLASS QUEST" variant="ghost" onPress={() => router.push({ pathname: '/class-quest/[id]', params: { id: 'new' } })} />
+        <SysButton label="+ NEW MAIN QUEST" variant="ghost" onPress={() => router.push({ pathname: '/main-quest/[id]', params: { id: 'new' } })} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -128,71 +130,172 @@ function JobChangeWindow({ player }: { player: PlayerData }) {
   );
 }
 
-function ClassQuestCard({ quest, player }: { quest: ClassQuestRow; player: PlayerData }) {
-  const st = player.state.classQuests.find((c) => c.id === quest.id);
-  const current = quest.steps.find((s) => !s.doneDay);
-  const complete = !current;
+const amount = (n: number, unit: string) => `${Math.round(n * 10) / 10}${unit ? ` ${unit}` : ''}`;
 
-  const advance = async () => {
-    await advanceClassQuest(quest.id, quest.steps);
-    const finishes = current && (!current.target || (current.count ?? 0) + 1 >= current.target);
-    const last = quest.steps.filter((s) => !s.doneDay).length === 1;
-    playSound(finishes ? (last ? 'levelup' : 'quest') : 'tick');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+function MainQuestCard({ quest, player }: { quest: MainQuestRow; player: PlayerData }) {
+  const st = player.state.mainQuests.find((m) => m.id === quest.id);
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [clearing, setClearing] = useState<{ ci: number; ti: number; task: QuestTask } | null>(null);
+  if (!st) return null;
+  const { data } = quest;
+  const linked = data.habitId ? player.state.record.habits.find((h) => h.habitId === data.habitId) : undefined;
+
+  const tapTask = (ci: number, ti: number, t: QuestTask) => {
+    if (t.doneDay) {
+      Alert.alert('Reopen this quest?', t.title, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reopen', onPress: () => updateQuestTask(quest.id, quest.name, data, ci, ti, 'undo') },
+      ]);
+      return;
+    }
+    if (!taskOpen(data, ci, ti)) return;
+    const finishes = !t.target || t.target <= 1 || (t.count ?? 0) + 1 >= t.target;
+    if (!finishes) {
+      updateQuestTask(quest.id, quest.name, data, ci, ti, 'advance');
+      playSound('tick');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      return;
+    }
+    setClearing({ ci, ti, task: t });
+  };
+
+  const undoCount = (ci: number, ti: number, t: QuestTask) => {
+    if (t.doneDay || !(t.count ?? 0)) return;
+    Alert.alert('Take one off?', `${t.title} (${t.count}/${t.target})`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Undo one', onPress: () => updateQuestTask(quest.id, quest.name, data, ci, ti, 'undo') },
+    ]);
   };
 
   return (
-    <Pressable onLongPress={() => router.push({ pathname: '/class-quest/[id]', params: { id: quest.id } })} delayLongPress={350}>
-      <SystemWindow title={complete ? 'CLEARED' : 'CLASS QUEST'} variant={complete ? 'gold' : 'epic'}>
-        <SysText style={styles.questName}>[{quest.name}]</SysText>
-        <ProgressBar value={st ? st.done / Math.max(1, st.total) : 0} color={colors.epic} height={5} glow={false} />
-        <View style={{ gap: 6 }}>
-          {quest.steps.map((s, i) => {
-            const isCurrent = s === current;
-            return (
-              <View key={i} style={styles.stepRow}>
-                <MaterialCommunityIcons
-                  name={s.doneDay ? 'check-circle' : isCurrent ? 'circle-slice-3' : 'circle-outline'}
-                  size={18}
-                  color={s.doneDay ? colors.gold : isCurrent ? colors.epic : colors.textDone}
-                />
-                <SysText style={{ flex: 1, fontSize: 14, color: s.doneDay ? colors.textDone : isCurrent ? colors.text : colors.textMuted }}>
-                  {s.title}
-                  {s.target && s.target > 1 ? ` (${s.doneDay ? s.target : (s.count ?? 0)}/${s.target})` : ''}
-                </SysText>
-                <SysText style={styles.grade}>{s.grade}</SysText>
+    <SystemWindow title={st.complete ? 'MAIN QUEST CLEARED' : 'MAIN QUEST'} variant={st.complete ? 'gold' : 'epic'}>
+      <SysText style={styles.questName}>[{quest.name}]</SysText>
+      <ProgressBar value={st.done / Math.max(1, st.total)} color={colors.epic} height={5} glow={false} />
+      <SysText variant="caption" style={{ textAlign: 'center' }}>
+        {st.done}/{st.total} quests · {data.stat}
+        {linked ? ` · ${linked.daysDone} study days · ${amount(linked.total, linked.unit)}` : ''}
+      </SysText>
+
+      {data.chapters.map((ch, ci) => {
+        const cs = st.chapters[ci];
+        const open = expanded === ci || (expanded === null && ci === st.current);
+        return (
+          <View key={ci} style={[styles.chapter, ci === st.current && !st.complete && { borderColor: colors.epic }]}>
+            <Pressable style={styles.chapterHead} onPress={() => setExpanded(open ? -1 : ci)} accessibilityRole="button">
+              <MaterialCommunityIcons
+                name={cs.cleared ? 'check-decagram' : cs.unlocked ? 'map-marker-path' : 'lock-outline'}
+                size={18}
+                color={cs.cleared ? colors.gold : cs.unlocked ? colors.epic : colors.textDone}
+              />
+              <SysText style={[styles.chapterTitle, !cs.unlocked && { color: colors.textDone }]} numberOfLines={1}>
+                CH.{ci + 1} {ch.title}
+              </SysText>
+              <SysText variant="caption" style={{ fontSize: 12 }}>
+                {cs.cleared ? 'cleared' : `${cs.done}/${cs.total}`}
+              </SysText>
+            </Pressable>
+            {open ? (
+              <View style={{ gap: 6 }}>
+                {ch.tasks.map((t, ti) => {
+                  const can = taskOpen(data, ci, ti);
+                  const waiting = !t.doneDay && !can;
+                  return (
+                    <Pressable
+                      key={ti}
+                      style={styles.task}
+                      onPress={() => tapTask(ci, ti, t)}
+                      onLongPress={() => undoCount(ci, ti, t)}
+                      delayLongPress={350}
+                      accessibilityRole="button"
+                      accessibilityState={{ checked: !!t.doneDay, disabled: waiting }}
+                      accessibilityLabel={`${t.boss ? 'Boss: ' : ''}${t.title}`}>
+                      <MaterialCommunityIcons
+                        name={t.doneDay ? 'check-circle' : TASK_ICON[t.boss ? 'boss' : t.type]}
+                        size={18}
+                        color={t.doneDay ? colors.gold : t.boss ? colors.dangerSoft : waiting ? colors.textDone : colors.epic}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <SysText style={{ fontSize: 14, color: t.doneDay ? colors.textDone : waiting ? colors.textMuted : colors.text }}>
+                          {t.boss ? 'BOSS: ' : ''}
+                          {t.title}
+                          {t.target && t.target > 1 ? ` (${t.doneDay ? t.target : (t.count ?? 0)}/${t.target})` : ''}
+                        </SysText>
+                        {t.note ? (
+                          <SysText variant="caption" style={{ fontSize: 11 }} numberOfLines={2}>
+                            “{t.note}”
+                          </SysText>
+                        ) : null}
+                      </View>
+                      <SysText style={styles.grade}>
+                        {t.grade} · {taskXp(t)}
+                      </SysText>
+                    </Pressable>
+                  );
+                })}
+                {ch.bounty ? <SysText style={styles.bounty}>Bounty: {ch.bounty}</SysText> : null}
+                {cs.reward ? (
+                  <View style={styles.reward}>
+                    <SysText variant="caption">Chapter reward</SysText>
+                    <ItemLine item={cs.reward} compact />
+                  </View>
+                ) : null}
               </View>
-            );
-          })}
-        </View>
-        {st ? (
-          <View style={styles.reward}>
-            <SysText variant="caption">Reward</SysText>
-            <SysText style={{ fontSize: 13, color: RARITY_COLOR[st.reward.rarity as keyof typeof RARITY_COLOR] }}>
-              [{st.reward.rarity}] {st.reward.name}
-            </SysText>
-            <SysText variant="caption" style={{ fontSize: 11 }}>
-              {st.reward.effects.map(describeEffect).join(' · ')}
-            </SysText>
+            ) : null}
           </View>
-        ) : null}
-        {!complete ? (
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <SysButton
-              label={current?.target && current.target > 1 ? '+1' : 'STEP DONE'}
-              style={{ flex: 2 }}
-              onPress={advance}
-            />
-            <SysButton label="UNDO" variant="ghost" style={{ flex: 1 }} onPress={() => undoClassQuest(quest.id, quest.steps)} />
-          </View>
-        ) : (
-          <SysButton label="UNDO LAST STEP" variant="ghost" onPress={() => undoClassQuest(quest.id, quest.steps)} />
-        )}
-        <SysText variant="caption" style={{ textAlign: 'center', fontSize: 11 }}>
-          Long-press to edit
-        </SysText>
-      </SystemWindow>
-    </Pressable>
+        );
+      })}
+
+      <View style={styles.reward}>
+        <SysText variant="caption">Quest reward · +{st.completeXp} EXP</SysText>
+        <ItemLine item={st.reward} compact />
+        {st.title ? <SysText style={{ fontSize: 12, color: colors.gold }}>Title: [{st.title}] · +2 {data.stat}</SysText> : null}
+        {data.bounty ? <SysText style={styles.bounty}>Bounty: {data.bounty}</SysText> : null}
+      </View>
+      <SysButton label="EDIT" variant="ghost" onPress={() => router.push({ pathname: '/main-quest/[id]', params: { id: quest.id } })} />
+      {clearing ? (
+        <ClearSheet
+          task={clearing.task}
+          onClose={() => setClearing(null)}
+          onSave={async (note) => {
+            const { ci, ti } = clearing;
+            setClearing(null);
+            await updateQuestTask(quest.id, quest.name, data, ci, ti, 'advance', note);
+            const chapterDone = data.chapters[ci].tasks.every((o, j) => j === ti || o.doneDay);
+            playSound(chapterDone ? 'levelup' : 'quest');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          }}
+        />
+      ) : null}
+    </SystemWindow>
+  );
+}
+
+/** Clearing a quest: optionally write down what you learned (recall makes it stick). */
+function ClearSheet({ task, onClose, onSave }: { task: QuestTask; onClose: () => void; onSave: (note: string) => void }) {
+  const [note, setNote] = useState('');
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.backdrop}>
+        <SystemWindow title={task.boss ? 'BOSS DEFEATED' : 'QUEST CLEARED'} variant={task.boss ? 'gold' : 'epic'} pulse>
+          <SysText style={styles.questName}>{task.title}</SysText>
+          <SysText variant="caption" style={{ textAlign: 'center' }}>
+            +{taskXp(task)} EXP. In one line, what did you learn or build? (optional)
+          </SysText>
+          <TextInput
+            value={note}
+            onChangeText={setNote}
+            placeholder="Embeddings map meaning to distance…"
+            placeholderTextColor={colors.textDone}
+            style={styles.input}
+            multiline
+            autoFocus
+            accessibilityLabel="What you learned"
+          />
+          <SysButton label="CLEAR QUEST" variant={task.boss ? 'gold' : 'primary'} onPress={() => onSave(note)} />
+          <SysButton label="CANCEL" variant="ghost" onPress={onClose} />
+        </SystemWindow>
+      </View>
+    </Modal>
   );
 }
 
@@ -205,7 +308,24 @@ const styles = StyleSheet.create({
   trialRow: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
   trialPip: { width: 36, height: 12, borderWidth: 1, borderColor: colors.borderMuted },
   questName: { fontFamily: fonts.display, fontSize: 20, textAlign: 'center', color: colors.text },
-  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 28 },
-  grade: { fontFamily: fonts.display, fontSize: 13, color: colors.epic },
-  reward: { gap: 2, borderTopWidth: 1, borderTopColor: '#2c2650', paddingTop: 10 },
+  chapter: { borderWidth: 1, borderColor: colors.borderMuted, padding: 10, gap: 8 },
+  chapterHead: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 32 },
+  chapterTitle: { flex: 1, fontFamily: fonts.displaySemi, fontSize: 15, letterSpacing: 0.8, color: colors.text },
+  task: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 40 },
+  grade: { fontFamily: fonts.display, fontSize: 12, color: colors.epic },
+  bounty: { fontSize: 12, color: colors.gold },
+  reward: { gap: 4, borderTopWidth: 1, borderTopColor: '#2c2650', paddingTop: 10 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(2,4,9,0.88)', justifyContent: 'center', padding: 20 },
+  input: {
+    minHeight: 64,
+    borderWidth: 1,
+    borderColor: colors.borderMuted,
+    backgroundColor: colors.panelRow,
+    color: colors.text,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontFamily: fonts.body,
+    fontSize: 15,
+    textAlignVertical: 'top',
+  },
 });

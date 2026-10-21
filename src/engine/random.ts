@@ -2,7 +2,7 @@
 // drop can't be re-rolled by undoing and redoing, and every device agrees.
 
 /** 32-bit FNV-1a hash of a string. */
-function hash(s: string): number {
+export function hash(s: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);

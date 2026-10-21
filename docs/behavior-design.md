@@ -120,3 +120,15 @@ Ranked by strength of evidence × fit with the Solo Leveling/Overgeared theme.
 - **Computed by the engine** from existing day results, with no new storage: slip vs failure, comeback, drops, strength.
 - **`day_results` outcomes gain a per-goal `min` flag**, recording a Minimum Clear.
 - One app migration and one server migration.
+
+## Reward redesign (Phase 5.5)
+
+The first economy paid gold per quest, so income grew with every quest added (a test profile with 6 quests held 33k gold after 80 days) and Store prices stopped meaning anything. Items mostly boosted EXP, and random boxes sold chances for currency. The redesign follows what the research says about rewards that last:
+
+- **Informational, not controlling.** Expected tangible rewards lowered intrinsic motivation (d ≈ −0.40) while feedback on competence raised it, across 128 experiments ([Deci, Koestner & Ryan 1999/2001](https://www.selfdeterminationtheory.org/SDT/documents/2001_DeciKoestnerRyan.pdf)). So the main long-term rewards describe growth: the **Hunter's Record** (real totals, last 30 vs previous 30 days, personal bests) and the **Shadow Army** (habits that now run on their own).
+- **Visible progress and small wins** ([Amabile & Kramer, *The Progress Principle*](https://www.library.hbs.edu/working-knowledge/how-small-wins-unleash-creativity)) and the **goal gradient** ([Kivetz, Urminsky & Zheng 2006](https://business.columbia.edu/faculty/research/goal-gradient-hypothesis-resurrected-purchase-acceleration-illusionary-goal)): **Main Quests** split distant goals into chapters of near ones, every reward shows a progress bar, and Record titles mark 10×/50×/100× the daily target.
+- **Experiences over things, chosen in advance** ([Van Boven & Gilovich 2003](https://cdn.vanderbilt.edu/vu-wp0/wp-content/uploads/sites/59/2011/05/06143905/to-do-or-to-have.pdf)): **Bounties** are real rewards committed to a chapter or quest, so the anticipation is part of the payoff; the Store nudges toward experiences.
+- **Temptation bundling** ([Milkman, Minson & Volpp 2014](https://repository.upenn.edu/oid_papers/150), +51% gym visits early, fading over time): **Unlocks** turn a guilty pleasure into a free permission the moment the Daily Quest is kept: immediate, not bought.
+- **Gold as days of effort.** About 100 G per kept day, scaled by difficulty rather than quest count, so prices read as days ("movie night ≈ 5 days"). Applied from the update day on; earlier gold is untouched.
+- **Gear that changes rules, not just numbers** (forgiven slips, better Minimum Clears, cheaper Rest Days), plus **the Forge** for meaningful choice with duplicates. Recalling what you learned when clearing a Main Quest quest is retrieval practice.
+- **Guardrails kept:** nothing random is sold (boxes removed), surprises stay free and can be turned off, no artificial scarcity or countdowns ([Chou on habit-gamification traps](https://yukaichou.com/gamification-analysis/habit-formation-gamification-octalysis-design/)).

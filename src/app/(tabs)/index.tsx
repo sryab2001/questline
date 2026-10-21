@@ -45,6 +45,7 @@ export default function QuestsScreen() {
   const clearEvent = useClearEvents(player?.state.today, grades, player?.today ?? '');
   if (!player) return null;
   const { state, settings, now, activeSurvival } = player;
+  const unlocked = player.storeItems.filter((i) => i.kind === 'unlock').map((i) => i.name);
   const openGoal = state.today.goals.find((g) => g.habitId === openId) ?? null;
 
   const onPressGoal = async (g: GoalProgress) => {
@@ -213,6 +214,9 @@ export default function QuestsScreen() {
           ) : null}
           {state.today.allCleared ? (
             <SysText style={[styles.warning, { color: colors.cyan }]}>Daily Quest complete. Rewards received.</SysText>
+          ) : null}
+          {state.today.kept && unlocked.length > 0 ? (
+            <SysText style={[styles.warning, { color: colors.epic }]}>Unlocked: {unlocked.join(' · ')}</SysText>
           ) : null}
         </SystemWindow>
 

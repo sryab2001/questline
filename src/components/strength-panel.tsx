@@ -1,8 +1,7 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { setTitle } from '@/db/actions';
-import { ACHIEVEMENT_BY_TITLE, describeEffect, PASSIVE_STAT_BONUS } from '@/engine';
+import { ACHIEVEMENT_BY_TITLE, describeEffect } from '@/engine';
 import type { PlayerData } from '@/hooks/use-player-state';
 import { colors, fonts } from '@/theme';
 
@@ -50,38 +49,14 @@ export function HabitStrengthWindow({ player }: { player: PlayerData }) {
   );
 }
 
-export function PassiveSkillsWindow({ player }: { player: PlayerData }) {
-  const mastered = player.habits.filter((h) => h.mastered && !h.archived);
-  if (mastered.length === 0) return null;
-  return (
-    <SystemWindow title="PASSIVE SKILLS" variant="epic">
-      {mastered.map((h) => {
-        const st = player.state.habits[h.id];
-        const weak = st?.weakened;
-        return (
-          <View key={h.id} style={styles.skill}>
-            <MaterialCommunityIcons name={weak ? 'shield-off-outline' : 'infinity'} size={24} color={weak ? colors.dangerSoft : colors.epic} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <SysText style={{ fontFamily: fonts.bodySemi, fontSize: 15, color: colors.text }}>[{h.masteryName || `${h.name} Mastery`}]</SysText>
-              <SysText variant="caption" style={{ fontSize: 12 }}>
-                {weak
-                  ? 'Weakened: reminders are back until the habit recovers.'
-                  : `Permanent +${PASSIVE_STAT_BONUS} ${h.stat} · runs on its cue, no reminders`}
-              </SysText>
-            </View>
-          </View>
-        );
-      })}
-    </SystemWindow>
-  );
-}
-
-/** Titles earned from achievements (with effects), mastered quests and strong Seasons. */
+/** Titles earned from achievements (with effects), Main Quests, Record milestones, mastered quests and strong Seasons. */
 export function earnedTitles(player: PlayerData): string[] {
   const fromAchievements = player.state.achievements.filter((a) => a.unlockedDay).map((a) => a.title);
+  const fromQuests = player.state.mainQuests.filter((q) => q.complete && q.title).map((q) => q.title!);
+  const fromRecord = player.state.record.milestones.map((m) => m.title);
   const fromMastery = player.habits.filter((h) => h.mastered && h.masteryTitle).map((h) => h.masteryTitle!);
   const fromSeasons = player.state.seasonTitles.map((t) => `${t.title} (${t.month})`);
-  return [...new Set([...fromAchievements, ...fromMastery, ...fromSeasons])];
+  return [...new Set([...fromAchievements, ...fromQuests, ...fromRecord, ...fromMastery, ...fromSeasons])];
 }
 
 export function TitlePicker({ player, onClose }: { player: PlayerData; onClose: () => void }) {
@@ -130,7 +105,6 @@ export function TitlePicker({ player, onClose }: { player: PlayerData; onClose: 
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  skill: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   backdrop: { flex: 1, backgroundColor: 'rgba(2,4,9,0.85)', justifyContent: 'center', padding: 20 },
   titleRow: { minHeight: 52, borderWidth: 1, borderColor: colors.borderMuted, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 6 },
 });
