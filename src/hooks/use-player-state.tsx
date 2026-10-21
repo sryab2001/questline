@@ -20,6 +20,7 @@ import {
   toEngineHabit,
   updateSettings,
 } from '@/db/actions';
+import { isTestWorld } from '@/db/client';
 import {
   addDays,
   type BoxResult,
@@ -334,6 +335,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const planKey = plan ? `${today}|${JSON.stringify(plan)}` : null;
   useEffect(() => {
     if (!plan) return;
+    // The Test World leaves your real reminders alone.
+    if (isTestWorld()) return;
     const t = setTimeout(() => syncReminders(plan).catch(() => {}), 800);
     return () => clearTimeout(t);
     // planKey captures every field of plan.

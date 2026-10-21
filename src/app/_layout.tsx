@@ -10,7 +10,8 @@ import { StyleSheet, View } from 'react-native';
 
 import { SysText } from '@/components/sys-text';
 import { ensureSettings } from '@/db/actions';
-import { db } from '@/db/client';
+import { db, useWorld } from '@/db/client';
+import { seedTestWorldIfEmpty } from '@/db/test-world';
 import { PlayerProvider } from '@/hooks/use-player-state';
 import { colors } from '@/theme';
 
@@ -19,6 +20,12 @@ import migrations from '../../drizzle/migrations';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  // Switching between the real and Test World remounts everything on the other database.
+  const world = useWorld();
+  return <WorldRoot key={world} />;
+}
+
+function WorldRoot() {
   const [fontsLoaded, fontError] = useFonts({
     Rajdhani_500Medium,
     Rajdhani_600SemiBold,
@@ -31,7 +38,7 @@ export default function RootLayout() {
   const [seeded, setSeeded] = useState(false);
 
   useEffect(() => {
-    if (migrated) ensureSettings().then(() => setSeeded(true));
+    if (migrated) ensureSettings().then(seedTestWorldIfEmpty).then(() => setSeeded(true));
   }, [migrated]);
 
   const ready = (fontsLoaded || fontError) && seeded;

@@ -5,6 +5,7 @@ import type { ComponentProps } from 'react';
 import type { ColorValue } from 'react-native';
 
 import { SystemNotices } from '@/components/system-notices';
+import { TestWorldBanner } from '@/components/test-world-panel';
 import { usePlayerState } from '@/hooks/use-player-state';
 import { useSyncStatus } from '@/sync/status';
 import { colors, fonts } from '@/theme';
@@ -26,6 +27,7 @@ export default function TabsLayout() {
   return (
     <>
       <SystemNotices />
+      <TestWorldBanner />
       <Tabs
         screenOptions={{
           headerShown: false,

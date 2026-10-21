@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import * as SecureStore from 'expo-secure-store';
 
-import { db } from '@/db/client';
+import { db, isTestWorld } from '@/db/client';
 import { dayResults, settings } from '@/db/schema';
 
 import { NetworkError, normalizeServerUrl, PbClient, PbError, type PbRecord } from './client';
@@ -47,6 +47,7 @@ async function saveCursors(c: Cursors) {
 // ---------- public API ----------
 
 export async function signIn(serverUrl: string, email: string, password: string) {
+  if (isTestWorld()) throw new Error('Sync is disabled in the Test World.');
   const url = normalizeServerUrl(serverUrl);
   const auth = await new PbClient(url).authWithPassword(email.trim(), password);
   await saveSession({ serverUrl: url, token: auth.token, userId: auth.record.id, email: auth.record.email });
@@ -73,6 +74,8 @@ let again = false;
 
 /** Pushes local changes, then pulls remote ones. Overlapping calls coalesce into one extra run. */
 export function syncNow(): Promise<void> {
+  // The Test World never talks to the server.
+  if (isTestWorld()) return Promise.resolve();
   if (running) {
     again = true;
     return running;

@@ -8,9 +8,11 @@ import { HourStepper } from '@/components/hour-stepper';
 import { ScreenHeader } from '@/components/screen-header';
 import { SysButton } from '@/components/sys-button';
 import { SyncPanel } from '@/components/sync-panel';
+import { TestWorldPanel } from '@/components/test-world-panel';
 import { SysText } from '@/components/sys-text';
 import { SystemWindow } from '@/components/system-window';
 import { devSimulateMissedDay, deviceTimeZone, updateSettings } from '@/db/actions';
+import { useWorld } from '@/db/client';
 import { usePlayerState } from '@/hooks/use-player-state';
 import { notificationPermission, setupNotifications } from '@/notifications';
 import { colors, fonts } from '@/theme';
@@ -24,6 +26,7 @@ const URGENT_OPTIONS = [
 
 export default function SettingsScreen() {
   const player = usePlayerState();
+  const world = useWorld();
   const [name, setName] = useState(player?.settings.playerName ?? '');
   const [notifOk, setNotifOk] = useState<boolean | null>(null);
 
@@ -129,7 +132,8 @@ export default function SettingsScreen() {
           <SysButton label="HOW THE SYSTEM WORKS" variant="ghost" onPress={() => router.push('/guide')} />
         </SystemWindow>
 
-        <SyncPanel />
+        <TestWorldPanel />
+        {world === 'real' ? <SyncPanel /> : null}
 
         <SystemWindow title="NOTIFICATIONS">
           <SysText>
