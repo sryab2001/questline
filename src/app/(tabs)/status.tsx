@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EquipmentWindow, HiddenStatsWindow } from '@/components/overgeared';
 import { ProgressBar } from '@/components/progress-bar';
 import { HabitStrengthWindow, PassiveSkillsWindow, TitlePicker } from '@/components/strength-panel';
 import { SysButton } from '@/components/sys-button';
@@ -21,6 +22,7 @@ export default function StatusScreen() {
   const [pickingTitle, setPickingTitle] = useState(false);
   if (!player) return null;
   const { state, settings } = player;
+  const bonus = (stat: Stat) => state.passiveBonus[stat] + state.allStatsBonus;
   const nextRank = RANKS[RANKS.indexOf(state.rank) + 1];
   const points = Math.max(0, state.abilityPoints.available);
   const rest = state.skills.rest_day;
@@ -58,6 +60,7 @@ export default function StatusScreen() {
         <View style={styles.topBar}>
           <SysText variant="caption">{state.streak}-day streak</SysText>
           <View style={{ flexDirection: 'row' }}>
+            <IconButton icon="trophy-outline" label="Achievements" onPress={() => router.push('/achievements')} />
             <IconButton icon="calendar-month-outline" label="History" onPress={() => router.push('/history')} />
             <IconButton icon="cog-outline" label="Settings" onPress={() => router.push('/settings')} />
           </View>
@@ -71,7 +74,7 @@ export default function StatusScreen() {
             </View>
             <View style={styles.info}>
               <InfoRow label="NAME" value={settings.playerName} />
-              <InfoRow label="JOB" value="None" />
+              <InfoRow label="JOB" value={state.jobChange.job?.name ?? 'None'} gold={!!state.jobChange.job} />
               <Pressable onPress={() => setPickingTitle(true)} accessibilityRole="button" accessibilityLabel="Change title">
                 <InfoRow label="TITLE" value={settings.title || 'None ›'} gold={!!settings.title} />
               </Pressable>
@@ -92,7 +95,7 @@ export default function StatusScreen() {
               <View style={{ flex: 1, gap: 2 }}>
                 <SysText variant="number">
                   {state.stats[stat]}
-                  {state.passiveBonus[stat] ? <SysText style={{ fontSize: 13, color: colors.epic }}> (+{state.passiveBonus[stat]})</SysText> : null}
+                  {bonus(stat) ? <SysText style={{ fontSize: 13, color: colors.epic }}> (+{bonus(stat)})</SysText> : null}
                 </SysText>
                 <SysText variant="caption" style={{ fontSize: 11 }}>
                   {STAT_INFO[stat].source}
@@ -130,8 +133,10 @@ export default function StatusScreen() {
           ) : null}
         </SystemWindow>
 
+        <EquipmentWindow player={player} />
         <PassiveSkillsWindow player={player} />
         <HabitStrengthWindow player={player} />
+        <HiddenStatsWindow player={player} />
 
         <SystemWindow title="SKILLS" variant="epic">
           <View style={styles.skillRow}>
@@ -169,7 +174,7 @@ export default function StatusScreen() {
   );
 }
 
-function IconButton({ icon, label, onPress }: { icon: 'cog-outline' | 'calendar-month-outline'; label: string; onPress: () => void }) {
+function IconButton({ icon, label, onPress }: { icon: 'cog-outline' | 'calendar-month-outline' | 'trophy-outline'; label: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={6} style={styles.iconBtn}>
       <MaterialCommunityIcons name={icon} size={22} color={colors.textMuted} />

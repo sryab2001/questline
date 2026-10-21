@@ -11,6 +11,9 @@ import {
   GATE_DAYS_REQUIRED,
   GATE_REWARD,
   GOAL_DROP_CHANCE,
+  JOB_CHANGE_LEVEL,
+  JOB_TRIAL_DAYS,
+  JOB_XP_BONUS,
   MASTERY_MIN_CHECKIN,
   MASTERY_MIN_STRENGTH,
   MIN_CLEAR_REWARD,
@@ -81,8 +84,17 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'GATES, SEASONS, FRESH STARTS',
     body: [
-      `Each week a Gate opens. Keep ${GATE_DAYS_REQUIRED} days to clear it (+${GATE_REWARD.xp} EXP, +${GATE_REWARD.gold} G). Its card starts with one bonus stamp already filled.`,
+      `Each week a Gate opens. Keep ${GATE_DAYS_REQUIRED} days to clear it (+${GATE_REWARD.xp} EXP, +${GATE_REWARD.gold} G and a rated item). Its card starts with one bonus stamp already filled.`,
       'Each month is a Season with a recap and a title for strong months. After a broken streak, the next Monday or 1st offers a Reawakening: lighten your quests and start a new 3-day streak.',
+    ],
+  },
+  {
+    title: 'ITEMS, TITLES & JOBS',
+    body: [
+      'Rated items come from weekly Gates, achievements and Class Quests: a weapon, armor and accessory slot, each with small effects such as +EXP for one stat or +HP per kept day. Achievements also grant titles with an effect of their own.',
+      `At level ${JOB_CHANGE_LEVEL} the Job Change Quest unlocks: keep ${JOB_TRIAL_DAYS} days in a row, then pick a job from your strongest stats (+${JOB_XP_BONUS}% EXP for that stat). Effects of items, titles and jobs start the day you equip them, never retroactively.`,
+      'Class Quests are long-term goals with graded steps and no time limit. Each step pays like a big quest; finishing the chain awards an item rated by its length.',
+      'Hidden stats (Indomitable, Composure, Insight, Dignity) only mirror how you play.',
     ],
   },
   {

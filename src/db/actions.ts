@@ -11,6 +11,7 @@ import {
   type Habit,
   type OfferKind,
   type QuestOffer,
+  type Slot,
   rollBlessedBox,
   rollCursedBox,
   type SkillId,
@@ -24,6 +25,7 @@ import { uuidv7 } from '@/lib/uuid';
 import { db } from './client';
 import {
   checkins,
+  classQuests,
   dayResults,
   events,
   habits,
@@ -374,6 +376,89 @@ export async function acceptOffer(offer: QuestOffer) {
   await recordDecision(offer.habitId, offer.kind, true);
 }
 
+// ---------- Overgeared layer ----------
+
+export async function equipItem(slot: Slot, itemId: string) {
+  await addEvent('equip', slot, { itemId });
+}
+
+/** Equips a title (display) and records when, so its effect starts today, not retroactively. */
+export async function setTitle(title: string) {
+  await updateSettings({ title });
+  await addEvent('title', title);
+}
+
+export async function startJobTrial() {
+  await addEvent('job_trial', 'start');
+}
+
+export async function chooseJob(jobId: string) {
+  await addEvent('job', jobId);
+}
+
+/** A Class Quest step. A counter step (target) completes when count reaches target. */
+export interface ClassStep {
+  title: string;
+  grade: Grade;
+  target?: number | null;
+  count?: number;
+  doneDay: string | null;
+}
+
+export async function saveClassQuest(id: string | null, name: string, steps: ClassStep[]) {
+  const values = { name: name.trim(), rating: '', stepsJson: JSON.stringify(steps), currentStep: steps.findIndex((s) => !s.doneDay) };
+  if (id) {
+    await db.update(classQuests).set({ ...values, ...touched() }).where(eq(classQuests.id, id));
+  } else {
+    await db.insert(classQuests).values({ id: uuidv7(), ...stamps(), ...values, status: 'active' });
+  }
+}
+
+export async function deleteClassQuest(id: string) {
+  await db.update(classQuests).set({ deletedAt: new Date(), ...touched() }).where(eq(classQuests.id, id));
+}
+
+/** Advances the current step: +1 on a counter step, or marks a plain step done today. */
+export async function advanceClassQuest(id: string, steps: ClassStep[]) {
+  const i = steps.findIndex((s) => !s.doneDay);
+  if (i < 0) return;
+  const day = await todayKey();
+  const next = steps.map((s) => ({ ...s }));
+  const st = next[i];
+  if (st.target && st.target > 1) {
+    st.count = (st.count ?? 0) + 1;
+    if (st.count >= st.target) st.doneDay = day;
+  } else {
+    st.doneDay = day;
+  }
+  const done = next.every((s) => s.doneDay);
+  await db
+    .update(classQuests)
+    .set({ stepsJson: JSON.stringify(next), currentStep: done ? next.length : i, status: done ? 'cleared' : 'active', ...touched() })
+    .where(eq(classQuests.id, id));
+}
+
+/** Undoes the most recent progress (last done step, or one count). */
+export async function undoClassQuest(id: string, steps: ClassStep[]) {
+  const next = steps.map((s) => ({ ...s }));
+  const open = next.findIndex((s) => !s.doneDay);
+  const current = open >= 0 ? next[open] : null;
+  if (current?.target && (current.count ?? 0) > 0) {
+    // Take one count off the step in progress.
+    current.count = (current.count ?? 0) - 1;
+  } else {
+    // Reopen the last finished step (a counter step goes back to one short of its target).
+    const last = (open >= 0 ? open : next.length) - 1;
+    if (last < 0) return;
+    next[last].doneDay = null;
+    if (next[last].target) next[last].count = Math.max(0, (next[last].target ?? 1) - 1);
+  }
+  await db
+    .update(classQuests)
+    .set({ stepsJson: JSON.stringify(next), currentStep: next.findIndex((s) => !s.doneDay), status: 'active', ...touched() })
+    .where(eq(classQuests.id, id));
+}
+
 // ---------- dev tools ----------
 
 /**
@@ -425,6 +510,10 @@ export function allocationsQuery() {
 
 export function checkinsQuery() {
   return db.select().from(checkins).where(isNull(checkins.deletedAt));
+}
+
+export function classQuestsQuery() {
+  return db.select().from(classQuests).where(isNull(classQuests.deletedAt)).orderBy(asc(classQuests.createdAt));
 }
 
 export function eventsQuery() {

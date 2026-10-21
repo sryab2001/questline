@@ -1,5 +1,6 @@
 import type { DayKey } from './day';
 import type { Drop } from './drops';
+import type { Item, Modifiers, Slot } from './items';
 import type { Grade, Rank, SkillId, Stat } from './rules';
 
 /** `daily`, or a comma-separated list of weekdays (0 = Sunday), e.g. "1,3,5". */
@@ -96,6 +97,14 @@ export interface OfferDecision {
   habitId: string;
   kind: OfferKind;
   day: DayKey;
+  accepted?: boolean;
+}
+
+/** A long-term goal chain. Steps are done in order; each records the day it was done. */
+export interface ClassQuestInput {
+  id: string;
+  name: string;
+  steps: { title: string; grade: Grade; doneDay: DayKey | null }[];
 }
 
 export interface EngineInput {
@@ -113,6 +122,15 @@ export interface EngineInput {
   surprises?: boolean;
   /** Urgent Quests the player cleared. */
   urgentCleared?: { day: DayKey; challengeId: string }[];
+  /** Equipment changes in creation order ("" itemId = unequip). Effects apply from that day on. */
+  equips?: { slot: Slot; itemId: string; day: DayKey }[];
+  /** Title changes in creation order ("" = none). */
+  titleChanges?: { title: string; day: DayKey }[];
+  /** Job changes in creation order. */
+  jobChanges?: { jobId: string; day: DayKey }[];
+  /** Days the Job Change trial was (re)started. */
+  jobTrials?: { day: DayKey }[];
+  classQuests?: ClassQuestInput[];
 }
 
 export interface GoalProgress {
@@ -168,6 +186,53 @@ export interface DaySummary {
   strength: StrengthChange[];
   /** An Urgent Quest was cleared this day. */
   urgent: boolean;
+  /** This day completed the week's Gate. */
+  gateCleared: boolean;
+}
+
+export interface AchievementState {
+  id: string;
+  title: string;
+  description: string;
+  progress: number;
+  target: number;
+  unlockedDay: DayKey | null;
+  allStats: number;
+  itemRarity: string | null;
+}
+
+export interface OwnedItem extends Item {
+  obtainedDay: DayKey;
+}
+
+export interface HiddenStats {
+  indomitable: number;
+  composure: number;
+  insight: number;
+  dignity: number;
+}
+
+export interface JobChangeState {
+  unlocked: boolean;
+  unlockLevel: number;
+  job: { id: string; name: string; stat: Stat; description: string } | null;
+  trialStarted: DayKey | null;
+  trialProgress: number;
+  trialNeeded: number;
+  trialCleared: boolean;
+  options: { id: string; name: string; stat: Stat; description: string }[];
+}
+
+export interface ClassQuestState {
+  id: string;
+  name: string;
+  done: number;
+  total: number;
+  complete: boolean;
+  completedDay: DayKey | null;
+  /** What finishing it awards (the same item every time). */
+  reward: Item;
+  xpPerStep: number[];
 }
 
 export interface HabitStat {
@@ -234,6 +299,18 @@ export interface PlayerState {
   gate: GateState;
   /** Titles earned from finished Seasons (calendar months), oldest first. */
   seasonTitles: { month: string; title: string; keptDays: number }[];
+  achievements: AchievementState[];
+  /** Permanent bonus to every stat from first-clear achievements. */
+  allStatsBonus: number;
+  inventory: OwnedItem[];
+  equipped: Record<Slot, OwnedItem | null>;
+  /** The equipped title, if it's an unlocked achievement title (cosmetic titles have no effect). */
+  activeTitle: string | null;
+  /** Effects in force today from items, title and job. */
+  modifiers: Modifiers;
+  hiddenStats: HiddenStats;
+  jobChange: JobChangeState;
+  classQuests: ClassQuestState[];
   today: {
     goals: GoalProgress[];
     cleared: number;

@@ -143,11 +143,12 @@ Also shipped in this round: app icon and splash, Awakening onboarding, history c
 - History calendar (cleared, failed and shielded days).
 - Urgent Quests (random short challenges via notification): optional, frequency-controlled, at most one a day, never penalised, seeded per day.
 
-### Phase 5: Overgeared layer (4–6 days)
-- Titles with effects, first-clear bonuses.
-- Items with ratings (Normal → Myth) and equip slots.
-- Hidden stats (Indomitable, Composure, Insight, Dignity).
-- **Class Quests** and the Job Change; Main Quests.
+### Phase 5: Overgeared layer (4–6 days) ✅
+- Achievements (14) granting titles with effects, first-clear all-stat bonuses and rated items.
+- Items with ratings (Normal → Legendary) in weapon, armor and accessory slots, from Gates, achievements and Class Quests. Generated deterministically from their source.
+- Hidden stats (Indomitable, Composure, Insight, Dignity), shown as a mirror with no gameplay effect.
+- **Class Quests** (graded step chains or counted goals, no time limit) and the Job Change (level 10, 3-day trial, job from your top stats).
+- Effects of items, titles and jobs apply only from the day they're equipped, never retroactively. No server migration needed (uses existing events and class_quests).
 
 ### Phase 6: Android extras (2–3 days)
 - Home-screen widget showing today's quests.

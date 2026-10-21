@@ -3,11 +3,12 @@ import { router } from 'expo-router';
 import { usePlayerState } from '@/hooks/use-player-state';
 
 import { LevelUpModal } from './level-up-modal';
+import { RewardsModal, unseenRewards } from './overgeared';
 import { PenaltyModal } from './penalty-modal';
 import { previousMonth, SeasonRecapModal } from './season-recap-modal';
 import { SurvivalResultModal } from './survival-result-modal';
 
-/** Shows pending System messages one at a time: penalties, penalty-quest results, level-ups, then Season recaps. */
+/** Shows pending System messages one at a time: penalties, penalty-quest results, level-ups, rewards, then Season recaps. */
 export function SystemNotices() {
   const player = usePlayerState();
   if (!player) return null;
@@ -20,6 +21,9 @@ export function SystemNotices() {
   if (level > seen) {
     return <LevelUpModal from={seen} to={level} onOpenStatus={() => router.navigate('/status')} />;
   }
+
+  const rewards = unseenRewards(player);
+  if (rewards.achievements.length > 0 || rewards.items.length > 0) return <RewardsModal {...rewards} />;
 
   const lastMonth = previousMonth(player.today.slice(0, 7));
   const monthDays = player.state.history.filter((d) => d.day.startsWith(lastMonth) && d.kind !== 'empty');

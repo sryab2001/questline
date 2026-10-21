@@ -17,6 +17,7 @@ import {
   type DaySummary,
   describeDrop,
   GATE_REWARD,
+  gateItem,
   type GateState,
   type Habit,
   IDENTITY_TITLES,
@@ -30,6 +31,7 @@ import type { PlayerData } from '@/hooks/use-player-state';
 import { playSound } from '@/sound';
 import { colors, fonts } from '@/theme';
 
+import { RARITY_COLOR } from './gain-toast';
 import { SysButton } from './sys-button';
 import { SysText } from './sys-text';
 import { SystemWindow } from './system-window';
@@ -39,6 +41,7 @@ import { SystemWindow } from './system-window';
 const WEEK = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 export function GateCard({ gate }: { gate: GateState }) {
+  const reward = gateItem(gate.weekStart);
   return (
     <SystemWindow title="WEEKLY GATE" variant={gate.complete ? 'gold' : 'system'}>
       <View style={styles.gateRow}>
@@ -51,6 +54,9 @@ export function GateCard({ gate }: { gate: GateState }) {
         {gate.complete
           ? `Gate cleared. +${GATE_REWARD.xp} EXP · +${GATE_REWARD.gold} G`
           : `Keep ${gate.required - gate.kept} more day${gate.required - gate.kept === 1 ? '' : 's'} this week to clear the Gate (+${GATE_REWARD.xp} EXP, +${GATE_REWARD.gold} G).`}
+      </SysText>
+      <SysText variant="caption" style={{ textAlign: 'center', fontSize: 12, color: RARITY_COLOR[reward.rarity] }}>
+        {gate.complete ? 'Acquired' : 'Reward'}: [{reward.rarity}] {reward.name}
       </SysText>
     </SystemWindow>
   );

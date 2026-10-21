@@ -5,6 +5,8 @@ import { AppState } from 'react-native';
 import {
   allocationsQuery,
   checkinsQuery,
+  type ClassStep,
+  classQuestsQuery,
   closePendingDays,
   dayResultsQuery,
   eventsQuery,
@@ -30,6 +32,7 @@ import {
   type OfferKind,
   parseSurvival,
   type PlayerState,
+  type Slot,
   type SurvivalQuest,
   URGENT_FREQUENCIES,
   type UrgentFrequency,
@@ -72,6 +75,12 @@ export interface UrgentState {
   status: 'upcoming' | 'active' | 'done' | 'skipped' | 'expired';
 }
 
+export interface ClassQuestRow {
+  id: string;
+  name: string;
+  steps: ClassStep[];
+}
+
 export interface PlayerData {
   state: PlayerState;
   habits: Habit[];
@@ -104,6 +113,7 @@ export interface PlayerData {
   urgent: UrgentState | null;
   /** Upcoming Urgent Quests (today and the next days) that still need a notification. */
   urgentSchedule: { at: number; text: string }[];
+  classQuests: ClassQuestRow[];
 }
 
 const PlayerContext = createContext<PlayerData | null>(null);
@@ -121,12 +131,13 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
   const { data: storeRows } = useLiveQuery(storeItemsQuery());
   const { data: checkinRows } = useLiveQuery(checkinsQuery());
   const { data: eventRows } = useLiveQuery(eventsQuery());
+  const { data: classRows } = useLiveQuery(classQuestsQuery());
   const now = useNow();
 
   // Changes identity whenever any synced table changes (not on the minute tick).
   const dataVersion = useMemo(
-    () => [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows],
-    [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows],
+    () => [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows],
+    [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows],
   );
 
   const player = useMemo((): PlayerData | null => {
@@ -151,6 +162,11 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
         .map((e) => [e.ref, JSON.parse(e.dataJson!) as { challengeId: string; outcome: 'done' | 'skipped' }]),
     );
 
+    // Player decisions in the order they were made (timelines depend on order).
+    const ordered = [...eventRows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const data = (e: (typeof eventRows)[number]) => (e.dataJson ? JSON.parse(e.dataJson) : {});
+    const classQuests: ClassQuestRow[] = classRows.map((q) => ({ id: q.id, name: q.name, steps: JSON.parse(q.stepsJson) as ClassStep[] }));
+
     const parsedPurchases = purchaseRows.map((p) => ({ ...p, result: p.resultJson ? (JSON.parse(p.resultJson) as BoxResult) : null }));
     const state = computeState({
       habits,
@@ -163,7 +179,15 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
       checkins: checkinRows.map((c) => ({ habitId: c.habitId, day: c.day, avg: c.avg })),
       decisions: eventRows
         .filter((e) => e.kind === 'offer' && e.dataJson)
-        .map((e) => ({ habitId: e.ref, kind: (JSON.parse(e.dataJson!) as { kind: OfferKind }).kind, day: e.day })),
+        .map((e) => {
+          const d = JSON.parse(e.dataJson!) as { kind: OfferKind; accepted?: boolean };
+          return { habitId: e.ref, kind: d.kind, day: e.day, accepted: d.accepted };
+        }),
+      equips: ordered.filter((e) => e.kind === 'equip').map((e) => ({ slot: e.ref as Slot, itemId: data(e).itemId ?? '', day: e.day })),
+      titleChanges: ordered.filter((e) => e.kind === 'title').map((e) => ({ title: e.ref, day: e.day })),
+      jobChanges: ordered.filter((e) => e.kind === 'job').map((e) => ({ jobId: e.ref, day: e.day })),
+      jobTrials: ordered.filter((e) => e.kind === 'job_trial').map((e) => ({ day: e.day })),
+      classQuests: classQuests.map((q) => ({ id: q.id, name: q.name, steps: q.steps.map((st) => ({ title: st.title, grade: st.grade, doneDay: st.doneDay })) })),
       surprises: s.surprisesOn,
       urgentCleared: [...urgentAnswers.entries()]
         .filter(([, a]) => a.outcome === 'done')
@@ -235,8 +259,9 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
       seen: new Set(eventRows.filter((e) => e.kind === 'seen').map((e) => e.ref)),
       urgent,
       urgentSchedule,
+      classQuests,
     };
-  }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, now]);
+  }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows, now]);
 
   return { player, dataVersion };
 }

@@ -1,8 +1,12 @@
+import { ACHIEVEMENT_BY_TITLE, ACHIEVEMENTS, JOB_BY_ID, JOB_CHANGE_LEVEL, JOB_TRIAL_DAYS, JOB_XP_BONUS, JOBS, type Progress } from './achievements';
 import { addDays, type DayKey, dayRange, daysBetween, weekday } from './day';
 import { clearDrop, type Drop, goalDrop, isCritical, urgentDrop } from './drops';
+import { addEffects, classQuestRarity, emptyModifiers, gateItem, type Item, makeItem, type Modifiers, SLOTS, type Slot } from './items';
 import { levelFromTotalXp, rankForLevel } from './level';
 import {
   BASE_STAT,
+  CLASS_COMPLETE_XP,
+  CLASS_STEP_XP_MULT,
   CHECKIN_INTERVAL_DAYS,
   CHECKIN_MIN_STRENGTH,
   CLEARED_DAY_HP_GAIN,
@@ -143,7 +147,81 @@ export function computeState({
   decisions = [],
   surprises = true,
   urgentCleared = [],
+  equips = [],
+  titleChanges = [],
+  jobChanges = [],
+  jobTrials = [],
+  classQuests = [],
 }: EngineInput): PlayerState {
+  // ---------- Overgeared layer: progression, owned items, timelines ----------
+  const progress: Progress = {
+    daysCleared: 0,
+    maxStreak: 0,
+    gatesCleared: 0,
+    comebacks: 0,
+    survivals: 0,
+    minClears: 0,
+    masteries: 0,
+    legendaryDrops: 0,
+    level: 1,
+    jobChanged: 0,
+    classQuestsDone: 0,
+  };
+  let streakRun = 0;
+  let restDays = 0;
+  let highGradeClears = 0;
+  let allStatsBonus = 0;
+  const unlocked = new Map<string, DayKey>();
+  const owned = new Map<string, { item: Item; obtainedDay: DayKey }>();
+  const own = (item: Item, day: DayKey) => {
+    if (!owned.has(item.id)) owned.set(item.id, { item, obtainedDay: day });
+  };
+  const keptByWeek = new Map<DayKey, number>();
+  const gateDaysCleared = new Set<DayKey>();
+
+  /** Last value set on or before `day` (events are in creation order). */
+  const timeline = <T extends { day: DayKey }>(events: T[], day: DayKey) => {
+    let last: T | undefined;
+    for (const e of events) if (e.day <= day) last = e;
+    return last;
+  };
+  const jobOn = (day: DayKey) => {
+    const j = timeline(jobChanges, day);
+    return j ? (JOB_BY_ID.get(j.jobId) ?? null) : null;
+  };
+  /** Effects in force on `day`: equipped items owned by then, the equipped title if unlocked by then, and the job. */
+  const modsOn = (day: DayKey): Modifiers => {
+    const m = emptyModifiers();
+    for (const slot of SLOTS) {
+      const e = timeline(
+        equips.filter((x) => x.slot === slot),
+        day,
+      );
+      const o = e?.itemId ? owned.get(e.itemId) : undefined;
+      if (o && o.obtainedDay <= day) addEffects(m, o.item.effects);
+    }
+    const t = timeline(titleChanges, day);
+    const def = t ? ACHIEVEMENT_BY_TITLE.get(t.title) : undefined;
+    const unlockedOn = def ? unlocked.get(def.id) : undefined;
+    if (def && unlockedOn && unlockedOn <= day) addEffects(m, [def.titleEffect]);
+    const job = jobOn(day);
+    if (job) m.xpStatPct[job.stat] += JOB_XP_BONUS;
+    return m;
+  };
+
+  const masteryDays = groupByDay(decisions.filter((d) => d.kind === 'mastery' && d.accepted));
+  const jobDays = new Set(jobChanges.map((j) => j.day));
+  const classStepDays = new Map<DayKey, { questId: string; grade: Grade }[]>();
+  const classCompleteDay = new Map<string, DayKey>();
+  for (const q of classQuests) {
+    for (const s of q.steps) {
+      if (s.doneDay) classStepDays.set(s.doneDay, [...(classStepDays.get(s.doneDay) ?? []), { questId: q.id, grade: s.grade }]);
+    }
+    if (q.steps.length > 0 && q.steps.every((s) => s.doneDay)) {
+      classCompleteDay.set(q.id, q.steps.map((s) => s.doneDay!).sort().at(-1)!);
+    }
+  }
+
   let totalXp = 0;
   let hp = MAX_HP;
   let mp = MAX_MP;
@@ -191,15 +269,16 @@ export function computeState({
     drops: Drop[],
     criticals: string[],
     name: string,
+    mods: Modifiers,
   ) => {
-    const xpFactor = mastered ? MASTERED_XP_FACTOR : 1;
+    const xpFactor = (mastered ? MASTERED_XP_FACTOR : 1) * (1 + (mods.xpPct + mods.xpStatPct[g.stat]) / 100);
     if (g.done) {
       const crit = surprises && isCritical(g.habitId, day);
       if (crit) criticals.push(name);
       const xp = Math.round(GOAL_XP[grade] * xpFactor * (crit ? 2 : 1));
       completions[g.stat] += 1;
       doneCount.set(g.habitId, (doneCount.get(g.habitId) ?? 0) + 1);
-      mp = Math.min(MAX_MP, mp + MP_PER_GOAL);
+      mp = Math.min(MAX_MP, mp + MP_PER_GOAL + mods.mpPerGoal);
       applyDrop(goalDrop(g.habitId, day), drops);
       return { xp, gold: GOLD_PER_GOAL };
     }
@@ -226,20 +305,84 @@ export function computeState({
     for (const s of skillsByDay.get(day) ?? []) mp = Math.max(0, mp - SKILLS[s.skill].mpCost);
   };
 
+  /**
+   * End-of-day progression: streak run, Gates, Class Quest steps, masteries, jobs,
+   * level, then any achievements that just unlocked (with their items and bonuses).
+   */
+  const advance = (
+    day: DayKey,
+    kind: DayKind | null,
+    opts: { comeback: boolean; survival: string | null; drops: Drop[]; goals: { grade: Grade; done: boolean }[] },
+  ) => {
+    if (kind === 'cleared') progress.daysCleared += 1;
+    if (kind === 'cleared' || kind === 'min') {
+      streakRun += 1;
+      progress.maxStreak = Math.max(progress.maxStreak, streakRun);
+      const wk = weekStart(day);
+      const n = (keptByWeek.get(wk) ?? 0) + 1;
+      keptByWeek.set(wk, n);
+      if (n === GATE_DAYS_REQUIRED) {
+        progress.gatesCleared += 1;
+        totalXp += GATE_REWARD.xp;
+        goldEarned += GATE_REWARD.gold;
+        own(gateItem(wk), day);
+        gateDaysCleared.add(day);
+      }
+    } else if (kind === 'failure') {
+      streakRun = 0;
+    }
+    if (kind === 'min') progress.minClears += 1;
+    if (kind === 'rested') restDays += 1;
+    if (opts.comeback) progress.comebacks += 1;
+    if (opts.survival === 'cleared') progress.survivals += 1;
+    if (opts.drops.some((d) => d.rarity === 'Legendary')) progress.legendaryDrops += 1;
+    highGradeClears += opts.goals.filter((g) => g.done && (g.grade === 'B' || g.grade === 'A' || g.grade === 'S')).length;
+    for (const st of classStepDays.get(day) ?? []) {
+      totalXp += GOAL_XP[st.grade] * CLASS_STEP_XP_MULT;
+      goldEarned += GOLD_PER_GOAL;
+    }
+    for (const q of classQuests) {
+      if (classCompleteDay.get(q.id) !== day) continue;
+      progress.classQuestsDone += 1;
+      totalXp += CLASS_COMPLETE_XP;
+      own(makeItem(`class:${q.id}`, classQuestRarity(q.steps.length)), day);
+    }
+    progress.masteries += (masteryDays.get(day) ?? []).length;
+    if (jobDays.has(day)) progress.jobChanged = 1;
+    progress.level = Math.max(progress.level, levelFromTotalXp(totalXp).level);
+    for (const a of ACHIEVEMENTS) {
+      if (unlocked.has(a.id) || progress[a.metric] < a.target) continue;
+      unlocked.set(a.id, day);
+      allStatsBonus += a.allStats ?? 0;
+      if (a.item) own(makeItem(`ach:${a.id}`, a.item), day);
+    }
+  };
+
   /** Kind of the most recent day that had goals and wasn't a rest day. */
   let lastRelevant: DayKind | null = null;
 
-  const eventDays = [...closedByDay.keys(), ...purchasesByDay.keys(), ...skillsByDay.keys(), ...urgentDays].filter((d) => d < today);
+  const eventDays = [
+    ...closedByDay.keys(),
+    ...purchasesByDay.keys(),
+    ...skillsByDay.keys(),
+    ...urgentDays,
+    ...masteryDays.keys(),
+    ...jobDays,
+    ...classStepDays.keys(),
+  ].filter((d) => d < today);
   for (const day of [...new Set(eventDays)].sort()) {
     applyDayEvents(day);
     const outcome = closedByDay.get(day);
+    const mods = modsOn(day);
     if (!outcome) {
       // An Urgent Quest on a day with no Daily Quest still pays out.
+      const drops: Drop[] = [];
       if (urgentDays.has(day)) {
         totalXp += URGENT_REWARD.xp;
         goldEarned += URGENT_REWARD.gold;
-        applyDrop(urgentDrop(day), []);
+        applyDrop(urgentDrop(day), drops);
       }
+      advance(day, null, { comeback: false, survival: null, drops, goals: [] });
       continue;
     }
 
@@ -263,7 +406,7 @@ export function computeState({
     let xpGained = 0;
     let goldGained = 0;
     for (const g of goals) {
-      const r = rewardGoal(g, g.grade, activeMastery(g.habitId, g.mastered), day, drops, criticals, g.name);
+      const r = rewardGoal(g, g.grade, activeMastery(g.habitId, g.mastered), day, drops, criticals, g.name, mods);
       xpGained += r.xp;
       goldGained += r.gold;
     }
@@ -273,6 +416,7 @@ export function computeState({
       pointsEarned += POINTS_PER_DAILY_CLEAR;
       applyDrop(clearDrop(day), drops);
     }
+    goldGained = Math.round(goldGained * (1 + mods.goldPct / 100));
     const comeback = KEPT_KINDS.includes(kind) && prevMissed;
     if (comeback) {
       xpGained += Math.round(xpGained * COMEBACK_BONUS);
@@ -302,7 +446,7 @@ export function computeState({
       totalXp -= xpLost;
       hpChange = -Math.min(Math.round(FAILED_DAY_HP_LOSS * factor), hp);
     } else if (KEPT_KINDS.includes(kind)) {
-      hpChange = Math.min(CLEARED_DAY_HP_GAIN, MAX_HP - hp);
+      hpChange = Math.min(CLEARED_DAY_HP_GAIN + mods.hpPerKept, MAX_HP - hp);
     }
     hp += hpChange;
 
@@ -319,6 +463,7 @@ export function computeState({
     }
 
     if (kind !== 'empty' && kind !== 'rested') lastRelevant = kind;
+    advance(day, kind, { comeback, survival, drops, goals });
 
     history.push({
       day,
@@ -340,6 +485,7 @@ export function computeState({
       criticals,
       strength: strengthChanges,
       urgent,
+      gateCleared: gateDaysCleared.has(day),
     });
   }
 
@@ -374,11 +520,12 @@ export function computeState({
 
   const todayDrops: Drop[] = [];
   const todayCriticals: string[] = [];
+  const todayMods = modsOn(today);
   let todayXp = 0;
   let todayGold = 0;
   for (const g of goals) {
     const h = habitById.get(g.habitId)!;
-    const r = rewardGoal(g, h.grade, g.mastered && !g.weakened, today, todayDrops, todayCriticals, g.name);
+    const r = rewardGoal(g, h.grade, g.mastered && !g.weakened, today, todayDrops, todayCriticals, g.name, todayMods);
     todayXp += r.xp;
     todayGold += r.gold;
     if (g.done) grow(g.habitId, 1);
@@ -390,6 +537,7 @@ export function computeState({
     pointsEarned += POINTS_PER_DAILY_CLEAR;
     applyDrop(clearDrop(today), todayDrops);
   }
+  todayGold = Math.round(todayGold * (1 + todayMods.goldPct / 100));
   if (comebackToday) {
     todayXp += Math.round(todayXp * COMEBACK_BONUS);
     todayGold += Math.round(todayGold * COMEBACK_BONUS);
@@ -402,17 +550,16 @@ export function computeState({
   }
   totalXp += todayXp;
   goldEarned += todayGold;
+  // Today's progression is provisional, like its rewards.
+  const todayKind: DayKind | null = restedToday ? 'rested' : keptToday ? (allCleared ? 'cleared' : 'min') : null;
+  advance(today, todayKind, {
+    comeback: comebackToday,
+    survival: null,
+    drops: todayDrops,
+    goals: goals.map((g) => ({ grade: habitById.get(g.habitId)!.grade, done: g.done })),
+  });
 
-  // ---------- weekly Gates (every week, past and current) ----------
-  const keptByWeek = new Map<DayKey, number>();
-  for (const d of history) if (KEPT_KINDS.includes(d.kind)) keptByWeek.set(weekStart(d.day), (keptByWeek.get(weekStart(d.day)) ?? 0) + 1);
-  if (keptToday && !restedToday) keptByWeek.set(weekStart(today), (keptByWeek.get(weekStart(today)) ?? 0) + 1);
-  for (const kept of keptByWeek.values()) {
-    if (kept >= GATE_DAYS_REQUIRED) {
-      totalXp += GATE_REWARD.xp;
-      goldEarned += GATE_REWARD.gold;
-    }
-  }
+  // ---------- weekly Gate card ----------
   const thisWeek = weekStart(today);
   const summaryByDay = new Map(history.map((d) => [d.day, d]));
   const gateDays: GateState['days'] = Array.from({ length: 7 }, (_, i) => {
@@ -449,7 +596,8 @@ export function computeState({
       (level - 1) +
       Math.floor(completions[stat] / COMPLETIONS_PER_STAT_POINT) +
       allocated[stat] +
-      passiveBonus[stat];
+      passiveBonus[stat] +
+      allStatsBonus;
   }
 
   // ---------- streak: slips, rests and shields bend it, failures break it ----------
@@ -560,6 +708,67 @@ export function computeState({
     if (t) seasonTitles.push({ month, title: t.title, keptDays });
   }
 
+  // ---------- Overgeared layer outputs ----------
+  const achievements = ACHIEVEMENTS.map((a) => ({
+    id: a.id,
+    title: a.title,
+    description: a.description,
+    progress: Math.min(progress[a.metric], a.target),
+    target: a.target,
+    unlockedDay: unlocked.get(a.id) ?? null,
+    allStats: a.allStats ?? 0,
+    itemRarity: a.item ?? null,
+  }));
+  const inventory = [...owned.values()].map((o) => ({ ...o.item, obtainedDay: o.obtainedDay }));
+  const equipped = {} as Record<Slot, (Item & { obtainedDay: DayKey }) | null>;
+  for (const slot of SLOTS) {
+    const e = timeline(
+      equips.filter((x) => x.slot === slot),
+      today,
+    );
+    const o = e?.itemId ? owned.get(e.itemId) : undefined;
+    equipped[slot] = o ? { ...o.item, obtainedDay: o.obtainedDay } : null;
+  }
+  const titleNow = timeline(titleChanges, today)?.title || null;
+  const titleDef = titleNow ? ACHIEVEMENT_BY_TITLE.get(titleNow) : undefined;
+  const activeTitle = titleDef && unlocked.has(titleDef.id) ? titleNow : null;
+
+  // Job Change: unlocks at a level; the trial is consecutive kept days after it starts.
+  const jobNow = jobOn(today);
+  const trialStart = jobTrials.length ? jobTrials[jobTrials.length - 1].day : null;
+  let trialRun = 0;
+  let trialCleared = false;
+  if (trialStart) {
+    const days = [...history.filter((d) => d.day >= trialStart).map((d) => d.kind), ...(todayKind ? [todayKind] : [])];
+    for (const k of days) {
+      if (k === 'cleared' || k === 'min') trialRun += 1;
+      else if (k === 'slip' || k === 'failure' || k === 'shielded') trialRun = 0;
+      if (trialRun >= JOB_TRIAL_DAYS) trialCleared = true;
+    }
+  }
+  const topStats = [...STATS].sort((a, b) => stats[b] - stats[a]).slice(0, 3);
+  const jobChange = {
+    unlocked: level >= JOB_CHANGE_LEVEL || !!jobNow,
+    unlockLevel: JOB_CHANGE_LEVEL,
+    job: jobNow ? { id: jobNow.id, name: jobNow.name, stat: jobNow.stat, description: jobNow.description } : null,
+    trialStarted: trialStart,
+    trialProgress: trialCleared ? JOB_TRIAL_DAYS : Math.min(trialRun, JOB_TRIAL_DAYS),
+    trialNeeded: JOB_TRIAL_DAYS,
+    trialCleared,
+    options: topStats.map((stat) => ({ ...JOBS[stat], stat })),
+  };
+
+  const classQuestStates = classQuests.map((q) => ({
+    id: q.id,
+    name: q.name,
+    done: q.steps.filter((st) => st.doneDay && st.doneDay <= today).length,
+    total: q.steps.length,
+    complete: classCompleteDay.has(q.id) && classCompleteDay.get(q.id)! <= today,
+    completedDay: classCompleteDay.get(q.id) ?? null,
+    reward: makeItem(`class:${q.id}`, classQuestRarity(q.steps.length)),
+    xpPerStep: q.steps.map((st) => GOAL_XP[st.grade] * CLASS_STEP_XP_MULT),
+  }));
+
   return {
     totalXp,
     level,
@@ -584,6 +793,20 @@ export function computeState({
     offers,
     gate,
     seasonTitles,
+    achievements,
+    allStatsBonus,
+    inventory,
+    equipped,
+    activeTitle,
+    modifiers: todayMods,
+    hiddenStats: {
+      indomitable: progress.comebacks * 2 + progress.survivals * 3,
+      composure: progress.minClears + restDays,
+      insight: checkins.length + progress.masteries * 5,
+      dignity: progress.gatesCleared * 2 + highGradeClears,
+    },
+    jobChange,
+    classQuests: classQuestStates,
     today: {
       goals,
       cleared: clearedToday,

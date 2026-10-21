@@ -197,6 +197,10 @@ export const URGENT_POOL: { id: string; text: string; stat: Stat }[] = [
   { id: 'message', text: 'Send a kind message to someone', stat: 'SENSE' },
 ];
 
+/** Class Quests (long-term goal chains): EXP per step is GOAL_XP[grade] × this, plus a completion bonus. */
+export const CLASS_STEP_XP_MULT = 5;
+export const CLASS_COMPLETE_XP = 300;
+
 /** Every stat starts here. */
 export const BASE_STAT = 10;
 
