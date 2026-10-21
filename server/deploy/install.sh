@@ -72,6 +72,12 @@ port_taken_by_other() {
 }
 
 if [[ "$MODE" == "proxy" ]]; then
+  # A Caddy running in Docker can't reach 127.0.0.1 on the host.
+  if need docker && docker ps --format '{{.Image}}' 2>/dev/null | grep -qi caddy; then
+    echo "Your Caddy runs in Docker, so it can't reach a service on the host's 127.0.0.1." >&2
+    echo "Use the Docker setup instead:  sudo bash ./docker/setup.sh $DOMAIN" >&2
+    exit 1
+  fi
   if port_taken_by_other "$PORT"; then
     echo "Port $PORT is already in use by another program. Pick a free one with --port." >&2
     ss -ltnpH "sport = :$PORT" >&2 || true

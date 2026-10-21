@@ -1,0 +1,28 @@
+# Questline as its own compose project, attached to your existing Caddy network.
+# setup.sh writes CADDY_NETWORK and QUESTLINE_DATA into .env next to this file.
+services:
+  questline:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: questline-server:local
+    container_name: questline
+    restart: unless-stopped
+    volumes:
+      # Data lives outside the package folder, so upgrades never touch it.
+      - ${QUESTLINE_DATA:-/opt/questline/pb_data}:/pb/pb_data
+    # No "ports:" on purpose: nothing is exposed on the host or the internet.
+    # Caddy, on the same network, reaches it as questline:9090.
+    networks:
+      - caddy
+    mem_limit: 160m
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "3"
+
+networks:
+  caddy:
+    external: true
+    name: ${CADDY_NETWORK:?run setup.sh first (CADDY_NETWORK not set)}
