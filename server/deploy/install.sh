@@ -5,7 +5,7 @@
 #     sudo bash ./install.sh questline.example.com
 #
 #   Behind an existing reverse proxy such as Caddy (PocketBase stays on localhost):
-#     sudo bash ./install.sh questline.example.com --behind-proxy [--port 8090]
+#     sudo bash ./install.sh questline.example.com --behind-proxy [--port 9090]
 #
 #   Preview without changing anything (no sudo needed):
 #     bash ./install.sh questline.example.com --behind-proxy --dry-run
@@ -22,11 +22,11 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 DOMAIN=""
 MODE="standalone"
-PORT="8090"
+PORT="9090"
 DRY_RUN=0
 
 usage() {
-  echo "usage: sudo bash $0 your.domain.com [--behind-proxy [--port 8090]] [--dry-run]" >&2
+  echo "usage: sudo bash $0 your.domain.com [--behind-proxy [--port 9090]] [--dry-run]" >&2
   exit 1
 }
 

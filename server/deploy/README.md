@@ -4,7 +4,7 @@ PocketBase runs as a systemd service under its own unprivileged user. Typical me
 
 | Mode | When | Ports |
 |---|---|---|
-| **Behind your reverse proxy** (`--behind-proxy`) | The VM already runs Caddy/nginx for other sites | Listens on `127.0.0.1:8090` only; your proxy handles the domain and HTTPS. Firewall untouched. |
+| **Behind your reverse proxy** (`--behind-proxy`) | The VM already runs Caddy/nginx for other sites | Listens on `127.0.0.1:9090` only; your proxy handles the domain and HTTPS. Firewall untouched. |
 | **Standalone** | Nothing else uses ports 80/443 | PocketBase serves `:80`/`:443` itself with automatic Let's Encrypt HTTPS |
 
 The installer refuses to start in standalone mode if another web server already owns 80/443, and refuses `--behind-proxy` if the chosen port is taken. Preview any run with `--dry-run`; it changes nothing and needs no sudo.
@@ -18,7 +18,7 @@ bash ./install.sh questline.yourdomain.com --behind-proxy --dry-run   # preview
 sudo bash ./install.sh questline.yourdomain.com --behind-proxy         # install
 ```
 
-Use `--port 8095` (any free port 1024–65535) if 8090 is taken.
+Use `--port 9095` (any free port 1024–65535) if 9090 is taken.
 
 Then:
 
@@ -27,7 +27,7 @@ Then:
 
    ```
    questline.yourdomain.com {
-       reverse_proxy 127.0.0.1:8090
+       reverse_proxy 127.0.0.1:9090
    }
    ```
 
