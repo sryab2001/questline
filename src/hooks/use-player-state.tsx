@@ -19,6 +19,7 @@ import {
   updateSettings,
 } from '@/db/actions';
 import {
+  addDays,
   type BoxResult,
   checkSurvival,
   computeState,
@@ -30,6 +31,11 @@ import {
   parseSurvival,
   type PlayerState,
   type SurvivalQuest,
+  URGENT_FREQUENCIES,
+  type UrgentFrequency,
+  type UrgentQuest,
+  urgentQuestFor,
+  urgentWindow,
 } from '@/engine';
 import { syncReminders } from '@/notifications';
 import { setSoundEnabled } from '@/sound';
@@ -59,6 +65,13 @@ export interface SurvivalEntry {
   quest: SurvivalQuest & { seen?: boolean };
 }
 
+export interface UrgentState {
+  quest: UrgentQuest;
+  start: Date;
+  end: Date;
+  status: 'upcoming' | 'active' | 'done' | 'skipped' | 'expired';
+}
+
 export interface PlayerData {
   state: PlayerState;
   habits: Habit[];
@@ -73,6 +86,7 @@ export interface PlayerData {
     soundOn: boolean;
     surprisesOn: boolean;
     title: string;
+    urgentFrequency: UrgentFrequency;
   };
   today: string;
   now: Date;
@@ -86,6 +100,10 @@ export interface PlayerData {
   survivalResult: SurvivalEntry | null;
   /** Refs of one-time notices already shown ("season:2026-09", "report:2026-10-19", …). */
   seen: Set<string>;
+  /** Today's Urgent Quest, if the day has one. */
+  urgent: UrgentState | null;
+  /** Upcoming Urgent Quests (today and the next days) that still need a notification. */
+  urgentSchedule: { at: number; text: string }[];
 }
 
 const PlayerContext = createContext<PlayerData | null>(null);
@@ -124,6 +142,15 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
       survival: survivals[i].quest?.status ?? null,
     }));
 
+    const urgentFrequency: UrgentFrequency = (URGENT_FREQUENCIES as readonly string[]).includes(s.urgentFrequency)
+      ? (s.urgentFrequency as UrgentFrequency)
+      : 'sometimes';
+    const urgentAnswers = new Map(
+      eventRows
+        .filter((e) => e.kind === 'urgent' && e.dataJson)
+        .map((e) => [e.ref, JSON.parse(e.dataJson!) as { challengeId: string; outcome: 'done' | 'skipped' }]),
+    );
+
     const parsedPurchases = purchaseRows.map((p) => ({ ...p, result: p.resultJson ? (JSON.parse(p.resultJson) as BoxResult) : null }));
     const state = computeState({
       habits,
@@ -138,7 +165,29 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
         .filter((e) => e.kind === 'offer' && e.dataJson)
         .map((e) => ({ habitId: e.ref, kind: (JSON.parse(e.dataJson!) as { kind: OfferKind }).kind, day: e.day })),
       surprises: s.surprisesOn,
+      urgentCleared: [...urgentAnswers.entries()]
+        .filter(([, a]) => a.outcome === 'done')
+        .map(([day, a]) => ({ day, challengeId: a.challengeId })),
     });
+
+    // Urgent Quests: today's state, and notifications for the coming week.
+    const urgentFor = (day: string) => urgentQuestFor(day, urgentFrequency, s.morningHour, s.warningHour);
+    const todayQuest = urgentFor(today);
+    let urgent: UrgentState | null = null;
+    if (todayQuest) {
+      const { start, end } = urgentWindow(todayQuest);
+      const answer = urgentAnswers.get(today)?.outcome;
+      const status = answer ?? (now < start ? 'upcoming' : now < end ? 'active' : 'expired');
+      urgent = { quest: todayQuest, start, end, status };
+    }
+    const urgentSchedule: { at: number; text: string }[] = [];
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(today, i);
+      const q = urgentFor(day);
+      if (!q || urgentAnswers.has(day)) continue;
+      const at = urgentWindow(q).start.getTime();
+      if (at > now.getTime()) urgentSchedule.push({ at, text: q.text });
+    }
 
     const storeItems = storeRows.map((r) => ({ id: r.id, name: r.name, cost: r.cost }));
     const itemNames = new Map(storeRows.map((r) => [r.id, r.name]));
@@ -174,6 +223,7 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
         soundOn: s.soundOn,
         surprisesOn: s.surprisesOn,
         title: s.title,
+        urgentFrequency,
       },
       today,
       now,
@@ -183,6 +233,8 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
       activeSurvival: activeSurvival ?? null,
       survivalResult: survivalResult ?? null,
       seen: new Set(eventRows.filter((e) => e.kind === 'seen').map((e) => e.ref)),
+      urgent,
+      urgentSchedule,
     };
   }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, now]);
 
@@ -246,6 +298,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     restedToday: player.state.today.rested,
     survivalDeadline: player.activeSurvival?.quest.deadline ?? null,
     streakAtRisk: player.state.streakAtRisk,
+    urgent: player.urgentSchedule,
     cues: remindable
       .filter((g) => !g.done)
       .map((g) => {

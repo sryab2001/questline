@@ -31,6 +31,10 @@ export const settings = sqliteTable('settings', {
   surprisesOn: integer('surprises_on', { mode: 'boolean' }).notNull().default(true),
   /** Equipped title shown on the Status window. */
   title: text('title').notNull().default(''),
+  /** Urgent Quests: off | rare | sometimes | often. */
+  urgentFrequency: text('urgent_frequency', { enum: ['off', 'rare', 'sometimes', 'often'] })
+    .notNull()
+    .default('sometimes'),
 });
 
 export const habits = sqliteTable('habits', {

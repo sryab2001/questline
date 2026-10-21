@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import {
   acceptMastery,
   acceptOffer,
+  answerUrgent,
   markSeen,
   recordDecision,
   submitCheckin,
@@ -341,4 +342,33 @@ const styles = StyleSheet.create({
   replan: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 },
   replanBtn: { minWidth: 52, height: 40, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   replanText: { fontFamily: fonts.display, fontSize: 14, color: colors.cyan },
+  urgentText: { fontFamily: fonts.display, fontSize: 24, lineHeight: 30, textAlign: 'center', color: colors.text },
+  urgentMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  urgentTimer: { fontFamily: fonts.display, fontSize: 20, color: colors.gold, fontVariant: ['tabular-nums'] },
 });
+
+// ---------- Urgent Quest (optional surprise micro-quest) ----------
+
+export function UrgentCard({ urgent, now }: { urgent: NonNullable<PlayerData['urgent']>; now: Date }) {
+  const mins = Math.max(0, Math.ceil((urgent.end.getTime() - now.getTime()) / 60_000));
+  const answer = (outcome: 'done' | 'skipped') => {
+    if (outcome === 'done') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    return answerUrgent(urgent.quest.day, urgent.quest.challengeId, outcome);
+  };
+  return (
+    <SystemWindow title="URGENT QUEST" variant="gold" pulse>
+      <SysText style={styles.urgentText}>{urgent.quest.text}</SysText>
+      <View style={styles.urgentMeta}>
+        <SysText variant="caption">+{urgent.quest.stat} · bonus EXP and gold · chance of loot</SysText>
+        <SysText style={styles.urgentTimer}>{mins} min</SysText>
+      </View>
+      <SysText variant="caption" style={{ textAlign: 'center' }}>
+        Optional. Ignoring it costs nothing.
+      </SysText>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <SysButton label="DONE" variant="gold" style={{ flex: 1 }} onPress={() => answer('done')} />
+        <SysButton label="SKIP" variant="ghost" style={{ flex: 1 }} onPress={() => answer('skipped')} />
+      </View>
+    </SystemWindow>
+  );
+}

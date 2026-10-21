@@ -111,6 +111,8 @@ export interface EngineInput {
   decisions?: OfferDecision[];
   /** Surprise drops and Critical Clears (default on). */
   surprises?: boolean;
+  /** Urgent Quests the player cleared. */
+  urgentCleared?: { day: DayKey; challengeId: string }[];
 }
 
 export interface GoalProgress {
@@ -164,6 +166,8 @@ export interface DaySummary {
   drops: Drop[];
   criticals: string[];
   strength: StrengthChange[];
+  /** An Urgent Quest was cleared this day. */
+  urgent: boolean;
 }
 
 export interface HabitStat {
@@ -241,5 +245,6 @@ export interface PlayerState {
     comeback: boolean;
     drops: Drop[];
     criticals: string[];
+    urgentCleared: boolean;
   };
 }

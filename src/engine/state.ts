@@ -1,5 +1,5 @@
 import { addDays, type DayKey, dayRange, daysBetween, weekday } from './day';
-import { clearDrop, type Drop, goalDrop, isCritical } from './drops';
+import { clearDrop, type Drop, goalDrop, isCritical, urgentDrop } from './drops';
 import { levelFromTotalXp, rankForLevel } from './level';
 import {
   BASE_STAT,
@@ -42,6 +42,7 @@ import {
   SURVIVAL_PENALTY_FACTOR,
   UPGRADE_AFTER_CLEAN_DAYS,
   UPGRADE_FACTOR,
+  URGENT_REWARD,
   WEAKENED_BELOW,
 } from './rules';
 import type {
@@ -141,6 +142,7 @@ export function computeState({
   checkins = [],
   decisions = [],
   surprises = true,
+  urgentCleared = [],
 }: EngineInput): PlayerState {
   let totalXp = 0;
   let hp = MAX_HP;
@@ -211,6 +213,7 @@ export function computeState({
   const purchasesByDay = groupByDay<Purchase>(purchases.filter((p) => p.day <= today));
   const skillsByDay = groupByDay<SkillUse>(skillUses.filter((s) => s.day <= today));
   const used = (day: DayKey, skill: SkillId) => (skillsByDay.get(day) ?? []).some((s) => s.skill === skill);
+  const urgentDays = new Set(urgentCleared.filter((u) => u.day <= today).map((u) => u.day));
 
   /** Store purchases and skill costs for one day. */
   const applyDayEvents = (day: DayKey) => {
@@ -226,11 +229,19 @@ export function computeState({
   /** Kind of the most recent day that had goals and wasn't a rest day. */
   let lastRelevant: DayKind | null = null;
 
-  const eventDays = [...closedByDay.keys(), ...purchasesByDay.keys(), ...skillsByDay.keys()].filter((d) => d < today);
+  const eventDays = [...closedByDay.keys(), ...purchasesByDay.keys(), ...skillsByDay.keys(), ...urgentDays].filter((d) => d < today);
   for (const day of [...new Set(eventDays)].sort()) {
     applyDayEvents(day);
     const outcome = closedByDay.get(day);
-    if (!outcome) continue;
+    if (!outcome) {
+      // An Urgent Quest on a day with no Daily Quest still pays out.
+      if (urgentDays.has(day)) {
+        totalXp += URGENT_REWARD.xp;
+        goldEarned += URGENT_REWARD.gold;
+        applyDrop(urgentDrop(day), []);
+      }
+      continue;
+    }
 
     const { goals, survival = null } = outcome;
     const total = goals.length;
@@ -266,6 +277,13 @@ export function computeState({
     if (comeback) {
       xpGained += Math.round(xpGained * COMEBACK_BONUS);
       goldGained += Math.round(goldGained * COMEBACK_BONUS);
+    }
+    // Urgent Quests are a flat bonus, outside every multiplier.
+    const urgent = urgentDays.has(day);
+    if (urgent) {
+      xpGained += URGENT_REWARD.xp;
+      goldGained += URGENT_REWARD.gold;
+      applyDrop(urgentDrop(day), drops);
     }
     totalXp += xpGained;
     goldEarned += goldGained;
@@ -321,6 +339,7 @@ export function computeState({
       drops,
       criticals,
       strength: strengthChanges,
+      urgent,
     });
   }
 
@@ -374,6 +393,12 @@ export function computeState({
   if (comebackToday) {
     todayXp += Math.round(todayXp * COMEBACK_BONUS);
     todayGold += Math.round(todayGold * COMEBACK_BONUS);
+  }
+  const urgentToday = urgentDays.has(today);
+  if (urgentToday) {
+    todayXp += URGENT_REWARD.xp;
+    todayGold += URGENT_REWARD.gold;
+    applyDrop(urgentDrop(today), todayDrops);
   }
   totalXp += todayXp;
   goldEarned += todayGold;
@@ -569,6 +594,7 @@ export function computeState({
       comeback: comebackToday,
       drops: todayDrops,
       criticals: todayCriticals,
+      urgentCleared: urgentToday,
     },
   };
 }

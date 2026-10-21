@@ -20,6 +20,7 @@ import {
   OfferCard,
   ReawakeningCard,
   StreakRiskBanner,
+  UrgentCard,
 } from '@/components/system-cards';
 import { SystemWindow } from '@/components/system-window';
 import { addHabits, logProgress, SAMPLE_HABITS } from '@/db/actions';
@@ -122,6 +123,8 @@ export default function QuestsScreen() {
             </SysText>
           </SystemWindow>
         ) : null}
+
+        {player.urgent?.status === 'active' ? <UrgentCard urgent={player.urgent} now={now} /> : null}
 
         {state.today.rested ? (
           <SystemWindow variant="epic" title="REST DAY">

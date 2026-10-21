@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Chip } from '@/components/chip';
 import { HourStepper } from '@/components/hour-stepper';
 import { ScreenHeader } from '@/components/screen-header';
 import { SysButton } from '@/components/sys-button';
@@ -13,6 +14,13 @@ import { devSimulateMissedDay, deviceTimeZone, updateSettings } from '@/db/actio
 import { usePlayerState } from '@/hooks/use-player-state';
 import { notificationPermission, setupNotifications } from '@/notifications';
 import { colors, fonts } from '@/theme';
+
+const URGENT_OPTIONS = [
+  { value: 'off', label: 'Off' },
+  { value: 'rare', label: 'Rare' },
+  { value: 'sometimes', label: 'Sometimes' },
+  { value: 'often', label: 'Often' },
+] as const;
 
 export default function SettingsScreen() {
   const player = usePlayerState();
@@ -100,6 +108,23 @@ export default function SettingsScreen() {
               thumbColor={s.surprisesOn ? colors.cyan : colors.textMuted}
               accessibilityLabel="Surprise rewards"
             />
+          </View>
+          <View style={{ gap: 8 }}>
+            <View>
+              <SysText style={{ fontSize: 14, color: colors.text }}>Urgent Quests</SysText>
+              <SysText variant="caption">Optional surprise micro-quests between your reminder hours. Never penalised.</SysText>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {URGENT_OPTIONS.map((o) => (
+                <Chip
+                  key={o.value}
+                  label={o.label}
+                  selected={s.urgentFrequency === o.value}
+                  onPress={() => updateSettings({ urgentFrequency: o.value })}
+                  accessibilityLabel={`Urgent Quests: ${o.label}`}
+                />
+              ))}
+            </View>
           </View>
           <SysButton label="HOW THE SYSTEM WORKS" variant="ghost" onPress={() => router.push('/guide')} />
         </SystemWindow>

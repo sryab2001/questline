@@ -2,7 +2,7 @@
 
 How we turn the design ([game-design.md](game-design.md)) and the screen mockups into a real Android app.
 
-**Status (2026-10-20):** Phases 0–3 done. Server packaged for a Linux VM (Oracle ARM) in `server/deploy/`.
+**Status (2026-10-21):** Phases 0–4 done, behaviour design shipped, server live on Oracle (Docker behind Caddy). Server packaged for a Linux VM (Oracle ARM) in `server/deploy/`.
 
 **Decisions so far**
 - Name: **Questline**
@@ -138,10 +138,10 @@ Also shipped in this round: app icon and splash, Awakening onboarding, history c
 - Gold + **Store**: custom treats, Streak Shield, Blessed/Cursed Random Box.
 - **Penalty** screen + Survival make-up quest (4-hour window).
 
-### Phase 4: Polish (2–3 days)
+### Phase 4: Polish (2–3 days) ✅
 - Sounds and haptics on clear and level-up.
 - History calendar (cleared, failed and shielded days).
-- Urgent Quests (random short challenges via notification).
+- Urgent Quests (random short challenges via notification): optional, frequency-controlled, at most one a day, never penalised, seeded per day.
 
 ### Phase 5: Overgeared layer (4–6 days)
 - Titles with effects, first-clear bonuses.

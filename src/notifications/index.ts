@@ -56,6 +56,8 @@ export interface ReminderPlan {
   cues: string[];
   /** The last missed day was a Slip: missing today makes it a Failure. */
   streakAtRisk: boolean;
+  /** Upcoming Urgent Quests: when each appears and what it asks. */
+  urgent: { at: number; text: string }[];
 }
 
 /** Replaces every scheduled reminder with a fresh set built from the current state. */
@@ -98,6 +100,14 @@ export async function syncReminders(plan: ReminderPlan, now = new Date()) {
             : 'The Daily Quest is not complete. Failure will result in a penalty.',
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at, channelId: CHANNEL_ID },
+    });
+  }
+
+  // Urgent Quests: one notification when each appears (they are optional; no follow-ups).
+  for (const u of plan.urgent) {
+    await Notifications.scheduleNotificationAsync({
+      content: { title: '[URGENT QUEST]', body: `${u.text}. 45 minutes. Optional: bonus EXP, gold and a chance of loot.` },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(u.at), channelId: CHANNEL_ID },
     });
   }
 

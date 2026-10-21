@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `urgent_frequency` text DEFAULT 'sometimes' NOT NULL;

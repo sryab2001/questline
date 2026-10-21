@@ -1,6 +1,14 @@
 import type { DayKey } from './day';
 import { seededRng, weightedPick } from './random';
-import { CLEAR_DROP_CHANCE, CRITICAL_CHANCE, DROP_VALUES, GOAL_DROP_CHANCE, type Rarity, RARITY_WEIGHTS } from './rules';
+import {
+  CLEAR_DROP_CHANCE,
+  CRITICAL_CHANCE,
+  DROP_VALUES,
+  GOAL_DROP_CHANCE,
+  type Rarity,
+  RARITY_WEIGHTS,
+  URGENT_DROP_CHANCE,
+} from './rules';
 
 export type DropType = 'gold' | 'xp' | 'mp' | 'shield';
 
@@ -37,6 +45,11 @@ export function goalDrop(habitId: string, day: DayKey): Drop | null {
 /** Extra roll for clearing the whole Daily Quest. */
 export function clearDrop(day: DayKey): Drop | null {
   return roll('clear', `clear:${day}`, CLEAR_DROP_CHANCE);
+}
+
+/** Drop roll for clearing that day's Urgent Quest. */
+export function urgentDrop(day: DayKey): Drop | null {
+  return roll('urgent', `urgentdrop:${day}`, URGENT_DROP_CHANCE);
 }
 
 /** Critical Clear: double EXP for this quest today. */

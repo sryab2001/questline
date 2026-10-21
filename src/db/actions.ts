@@ -91,6 +91,7 @@ export type SettingsPatch = Partial<
     | 'soundOn'
     | 'surprisesOn'
     | 'title'
+    | 'urgentFrequency'
   >
 >;
 
@@ -344,6 +345,11 @@ export function recordDecision(habitId: string, kind: OfferKind, accepted: boole
 export async function submitCheckin(habitId: string, scores: number[]) {
   const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
   await db.insert(checkins).values({ id: uuidv7(), ...stamps(), habitId, day: await todayKey(), scoresJson: JSON.stringify(scores), avg });
+}
+
+/** Answers today's Urgent Quest: cleared or skipped (skipping never costs anything). */
+export async function answerUrgent(day: string, challengeId: string, outcome: 'done' | 'skipped') {
+  await addEvent('urgent', day, { challengeId, outcome });
 }
 
 /** Turns a quest into a Passive Skill. */

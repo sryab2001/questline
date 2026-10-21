@@ -156,6 +156,7 @@ export default function HistoryScreen() {
                   {detail.survival ? ` · Penalty quest ${detail.survival}` : ''}
                 </SysText>
                 {detail.comeback ? <SysText style={{ color: colors.gold }}>[Recovered] comeback bonus</SysText> : null}
+                {detail.urgent ? <SysText style={{ color: colors.gold }}>Urgent Quest cleared</SysText> : null}
                 {detail.criticals.length ? <SysText style={{ color: colors.gold }}>Critical Clear: {detail.criticals.join(', ')}</SysText> : null}
                 {detail.drops.map((d, i) => (
                   <SysText key={`drop${i}`} style={{ color: RARITY_COLOR[d.rarity], fontSize: 13 }}>

@@ -18,6 +18,10 @@ import {
   RARITIES,
   RARITY_WEIGHTS,
   SLIP_PENALTY_FACTOR,
+  URGENT_CHANCE,
+  URGENT_DROP_CHANCE,
+  URGENT_REWARD,
+  URGENT_WINDOW_MINUTES,
   WEAKENED_BELOW,
 } from '@/engine';
 import { colors, fonts } from '@/theme';
@@ -68,6 +72,13 @@ const SECTIONS: { title: string; body: string[] }[] = [
     ],
   },
   {
+    title: 'URGENT QUESTS',
+    body: [
+      `Sometimes the System issues a surprise micro-quest (a glass of water, 20 squats, two minutes of breathing) between your reminder hours. You have ${URGENT_WINDOW_MINUTES} minutes; clearing it gives +${URGENT_REWARD.xp} EXP, +${URGENT_REWARD.gold} G and a ${Math.round(URGENT_DROP_CHANCE * 100)}% chance of loot.`,
+      `They are entirely optional: ignoring or skipping one costs nothing. Choose how often in Settings: Rare (~${Math.round(URGENT_CHANCE.rare * 7)}/week), Sometimes (~${Math.round(URGENT_CHANCE.sometimes * 7)}/week), Often (~${Math.round(URGENT_CHANCE.often * 7)}/week) or Off. At most one a day.`,
+    ],
+  },
+  {
     title: 'GATES, SEASONS, FRESH STARTS',
     body: [
       `Each week a Gate opens. Keep ${GATE_DAYS_REQUIRED} days to clear it (+${GATE_REWARD.xp} EXP, +${GATE_REWARD.gold} G). Its card starts with one bonus stamp already filled.`,
@@ -77,7 +88,7 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'WHAT QUESTLINE WILL NOT DO',
     body: [
-      'No feeds, no endless scrolling, no daily login rewards, no guilt messages, no notification spam: at most a morning arrival, an evening warning, and a penalty-quest alert. Success is measured by how automatic your habits are, not by time in the app.',
+      'No feeds, no endless scrolling, no daily login rewards, no guilt messages, no notification spam: at most a morning arrival, an evening warning, a penalty-quest alert, and the occasional optional Urgent Quest (or none, if you turn them off). Success is measured by how automatic your habits are, not by time in the app.',
     ],
   },
 ];

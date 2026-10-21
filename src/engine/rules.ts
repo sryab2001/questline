@@ -163,6 +163,40 @@ export const IDENTITY_TITLES: Record<Stat, string> = {
   SENSE: 'The Perceptive',
 };
 
+// ---------- Urgent Quests (optional surprise micro-quests; never penalised) ----------
+
+export const URGENT_FREQUENCIES = ['off', 'rare', 'sometimes', 'often'] as const;
+export type UrgentFrequency = (typeof URGENT_FREQUENCIES)[number];
+/** Chance that a given day has an Urgent Quest: roughly 1, 3 and 5 a week. */
+export const URGENT_CHANCE: Record<UrgentFrequency, number> = { off: 0, rare: 0.15, sometimes: 0.4, often: 0.7 };
+export const URGENT_WINDOW_MINUTES = 45;
+export const URGENT_REWARD = { xp: 50, gold: 40 };
+export const URGENT_DROP_CHANCE = 0.5;
+
+/** Micro-challenges: short, safe, doable almost anywhere. */
+export const URGENT_POOL: { id: string; text: string; stat: Stat }[] = [
+  { id: 'water', text: 'Drink a full glass of water', stat: 'STA' },
+  { id: 'squats', text: 'Do 20 squats', stat: 'STR' },
+  { id: 'pushups', text: 'Do 10 push-ups', stat: 'STR' },
+  { id: 'plank', text: 'Hold a plank for 45 seconds', stat: 'STR' },
+  { id: 'walk', text: 'Take a 5-minute walk', stat: 'AGI' },
+  { id: 'stairs', text: 'Climb a flight of stairs twice', stat: 'AGI' },
+  { id: 'stretch', text: 'Stretch for 3 minutes', stat: 'AGI' },
+  { id: 'jacks', text: 'Do 30 jumping jacks', stat: 'AGI' },
+  { id: 'fruit', text: 'Eat a piece of fruit', stat: 'STA' },
+  { id: 'posture', text: 'Stand up and reset your posture for a minute', stat: 'STA' },
+  { id: 'read', text: 'Read 3 pages of a book', stat: 'INT' },
+  { id: 'learn', text: 'Learn one new word or fact and say it aloud', stat: 'INT' },
+  { id: 'plan', text: 'Write down your top 3 tasks for tomorrow', stat: 'INT' },
+  { id: 'inbox', text: 'Clear 5 messages or emails', stat: 'INT' },
+  { id: 'breathe', text: 'Two minutes of slow breathing, eyes closed', stat: 'SENSE' },
+  { id: 'nophone', text: 'Put your phone away for 20 minutes', stat: 'SENSE' },
+  { id: 'gratitude', text: 'Write one thing you are grateful for', stat: 'SENSE' },
+  { id: 'tidy', text: 'Tidy your desk or room for 5 minutes', stat: 'SENSE' },
+  { id: 'outside', text: 'Step outside and look at the sky for a minute', stat: 'SENSE' },
+  { id: 'message', text: 'Send a kind message to someone', stat: 'SENSE' },
+];
+
 /** Every stat starts here. */
 export const BASE_STAT = 10;
 

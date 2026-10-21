@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { type Drop, GOAL_XP, GOLD_PER_GOAL, type Grade, MASTERED_XP_FACTOR, type PlayerState } from '@/engine';
+import { type Drop, GOAL_XP, GOLD_PER_GOAL, type Grade, MASTERED_XP_FACTOR, type PlayerState, URGENT_REWARD } from '@/engine';
 import { playSound } from '@/sound';
 
 export interface ClearEvent {
@@ -21,15 +21,23 @@ export interface ClearEvent {
  * playing the System chime. The first render only records the baseline.
  */
 export function useClearEvents(today: PlayerState['today'] | undefined, grades: Map<string, Grade>, dayKey: string): ClearEvent | null {
-  const prev = useRef<{ day: string; done: Set<string> } | null>(null);
+  const prev = useRef<{ day: string; done: Set<string>; urgent: boolean } | null>(null);
   const [event, setEvent] = useState<ClearEvent | null>(null);
 
   useEffect(() => {
     if (!today) return;
     const done = new Set(today.goals.filter((g) => g.done).map((g) => g.habitId));
     const before = prev.current;
-    prev.current = { day: dayKey, done };
+    prev.current = { day: dayKey, done, urgent: today.urgentCleared };
     if (!before || before.day !== dayKey) return;
+
+    if (today.urgentCleared && !before.urgent) {
+      const drops = today.drops.filter((d) => d.source === 'urgent');
+      playSound('quest');
+      if (drops.length) setTimeout(() => playSound('purchase'), 450);
+      setEvent({ key: Date.now(), name: 'Urgent Quest', xp: URGENT_REWARD.xp, gold: URGENT_REWARD.gold, critical: false, drops, questComplete: false, comeback: false });
+      return;
+    }
 
     const newly = today.goals.filter((g) => g.done && !before.done.has(g.habitId));
     if (newly.length === 0) return;
