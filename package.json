@@ -2,7 +2,7 @@
   "name": "questline",
   "version": "0.1.0",
   "description": "Solo Leveling–inspired habit tracker for Android: your habits are Daily Quests.",
-  "author": "Aouthithiye Barathwaj SR Y <srya2001@gmail.com> (https://github.com/sryab2001)",
+  "author": "Aouthithiye Barathwaj SR Y <sryab2001@gmail.com> (https://github.com/sryab2001)",
   "license": "SEE LICENSE IN LICENSE.md",
   "main": "expo-router/entry",
   "dependencies": {
