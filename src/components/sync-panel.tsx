@@ -65,6 +65,9 @@ export function SyncPanel() {
         <Row label="Last sync" value={ago(status.lastSyncAt)} />
         <Row label="Waiting to upload" value={String(status.pending)} />
         {status.error ? <SysText style={styles.error}>{status.error}</SysText> : null}
+        <SysText variant="caption" style={{ fontSize: 11 }}>
+          Syncs when the app opens and every 5 minutes while it&apos;s open. Use Sync Now for anything urgent.
+        </SysText>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <SysButton label="SYNC NOW" style={{ flex: 1 }} disabled={status.state === 'syncing'} onPress={() => syncNow()} />
           <SysButton label="SIGN OUT" variant="ghost" style={{ flex: 1 }} onPress={confirmSignOut} />

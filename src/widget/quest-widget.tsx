@@ -1,3 +1,8 @@
+'use no memo';
+// ^ Widget components are called as plain functions by react-native-android-widget,
+// outside React. The React Compiler would add a cache hook to them, which throws
+// there and leaves the widget black.
+
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 
 import type { PlayerSnapshot, QuickGoal } from '@/quick/today';
@@ -29,6 +34,19 @@ export interface QuestWidgetProps {
   snapshot: PlayerSnapshot | null;
   /** Widget height in dp, to fit as many rows as there is room for. */
   height: number;
+}
+
+/** Shown instead of a black box if building the widget ever fails. */
+export function WidgetError({ message }: { message: string }) {
+  return (
+    <FlexWidget
+      clickAction="OPEN_APP"
+      style={{ height: 'match_parent', width: 'match_parent', backgroundColor: C.bg, borderColor: C.border, borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: 'column', flexGap: 4 }}>
+      <TextWidget text="DAILY QUEST" style={{ fontFamily: DISPLAY, fontSize: 15, color: C.cyan }} />
+      <TextWidget text="Tap to open Questline." style={{ fontFamily: BODY, fontSize: 13, color: C.text }} />
+      <TextWidget text={message} maxLines={3} truncate="END" style={{ fontFamily: BODY, fontSize: 10, color: C.textMuted }} />
+    </FlexWidget>
+  );
 }
 
 /** Today's Daily Quest on the home screen. Tap ✓ to clear a quest; tap anything else to open the app. */

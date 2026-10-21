@@ -48,7 +48,7 @@ import { syncReminders } from '@/notifications';
 import { handleNotificationAction, saveSnapshot } from '@/quick/today';
 import { setSoundEnabled } from '@/sound';
 import { initSync, syncNow } from '@/sync/engine';
-import { useSyncStatus } from '@/sync/status';
+import { getSyncStatus, useSyncStatus } from '@/sync/status';
 import { refreshWidget } from '@/widget/refresh';
 
 import { useNow } from './use-now';
@@ -126,9 +126,10 @@ export interface PlayerData {
 
 const PlayerContext = createContext<PlayerData | null>(null);
 
-const SYNC_DEBOUNCE_MS = 4000;
+/** Background sync cadence while the app is open. Settings also has Sync Now. */
+const SYNC_INTERVAL_MS = 5 * 60_000;
 
-function useComputePlayer(): { player: PlayerData | null; dataVersion: object } {
+function useComputePlayer(): PlayerData | null {
   const { data: settingsRows } = useLiveQuery(settingsQuery());
   const { data: habitRows } = useLiveQuery(habitsQuery());
   const { data: logRows } = useLiveQuery(logsQuery());
@@ -141,12 +142,6 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
   const { data: eventRows } = useLiveQuery(eventsQuery());
   const { data: classRows } = useLiveQuery(classQuestsQuery());
   const now = useNow();
-
-  // Changes identity whenever any synced table changes (not on the minute tick).
-  const dataVersion = useMemo(
-    () => [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows],
-    [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows],
-  );
 
   const player = useMemo((): PlayerData | null => {
     const s = settingsRows[0];
@@ -275,25 +270,26 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
     };
   }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows, now]);
 
-  return { player, dataVersion };
+  return player;
 }
 
 /** Computes player state once for the whole app and runs the game's side effects. */
 export function PlayerProvider({ children }: { children: ReactNode }) {
-  const { player, dataVersion } = useComputePlayer();
+  const player = useComputePlayer();
 
-  // Sync: on start, when returning to the app, and a few seconds after local changes.
+  // Sync: on start, every 5 minutes while open, and on return if the last sync is older
+  // than that. (Syncing on every local change looped: a sync's own writes count as changes.)
   useEffect(() => {
     initSync().then(() => syncNow());
+    const timer = setInterval(() => syncNow(), SYNC_INTERVAL_MS);
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active') syncNow();
+      if (s === 'active' && Date.now() - (getSyncStatus().lastSyncAt ?? 0) >= SYNC_INTERVAL_MS) syncNow();
     });
-    return () => sub.remove();
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
   }, []);
-  useEffect(() => {
-    const t = setTimeout(() => syncNow(), SYNC_DEBOUNCE_MS);
-    return () => clearTimeout(t);
-  }, [dataVersion]);
 
   // Close finished days whenever the day or habit list changes, but never mid-sync:
   // during a restore the logs may not have arrived yet.

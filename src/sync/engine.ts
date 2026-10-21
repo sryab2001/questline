@@ -124,7 +124,7 @@ async function runOnce() {
     setSyncStatus({ state: 'idle', lastSyncAt: Date.now(), error: null, pending: await countDirty() });
   } catch (e) {
     if (e instanceof NetworkError) {
-      setSyncStatus({ state: 'offline', error: 'Server unreachable. Is Tailscale on?', pending: await countDirty() });
+      setSyncStatus({ state: 'offline', error: 'Server unreachable. Check your connection.', pending: await countDirty() });
     } else if (e instanceof PbError && e.status === 401) {
       await SecureStore.deleteItemAsync(KEY_SESSION);
       setSyncStatus({ signedIn: false, state: 'error', error: 'Session expired. Sign in again.' });
