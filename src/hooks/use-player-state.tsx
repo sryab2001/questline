@@ -42,10 +42,14 @@ import {
   urgentQuestFor,
   urgentWindow,
 } from '@/engine';
+import * as Notifications from 'expo-notifications';
+
 import { syncReminders } from '@/notifications';
+import { handleNotificationAction, saveSnapshot } from '@/quick/today';
 import { setSoundEnabled } from '@/sound';
 import { initSync, syncNow } from '@/sync/engine';
 import { useSyncStatus } from '@/sync/status';
+import { refreshWidget } from '@/widget/refresh';
 
 import { useNow } from './use-now';
 
@@ -116,7 +120,7 @@ export interface PlayerData {
   /** Today's Urgent Quest, if the day has one. */
   urgent: UrgentState | null;
   /** Upcoming Urgent Quests (today and the next days) that still need a notification. */
-  urgentSchedule: { at: number; text: string }[];
+  urgentSchedule: { at: number; text: string; day: string; challengeId: string }[];
   mainQuests: MainQuestRow[];
 }
 
@@ -212,13 +216,13 @@ function useComputePlayer(): { player: PlayerData | null; dataVersion: object } 
       const status = answer ?? (now < start ? 'upcoming' : now < end ? 'active' : 'expired');
       urgent = { quest: todayQuest, start, end, status };
     }
-    const urgentSchedule: { at: number; text: string }[] = [];
+    const urgentSchedule: PlayerData['urgentSchedule'] = [];
     for (let i = 0; i < 7; i++) {
       const day = addDays(today, i);
       const q = urgentFor(day);
       if (!q || urgentAnswers.has(day)) continue;
       const at = urgentWindow(q, state.modifiers.urgentMinutes).start.getTime();
-      if (at > now.getTime()) urgentSchedule.push({ at, text: q.text });
+      if (at > now.getTime()) urgentSchedule.push({ at, text: q.text, day, challengeId: q.challengeId });
     }
 
     const storeItems: StoreItem[] = storeRows.map((r) => ({ id: r.id, name: r.name, cost: r.cost, kind: r.kind === 'unlock' ? 'unlock' : 'treat' }));
@@ -332,6 +336,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     survivalDeadline: player.activeSurvival?.quest.deadline ?? null,
     streakAtRisk: player.state.streakAtRisk,
     urgent: player.urgentSchedule,
+    quick: [...remindable.filter((g) => !g.done), ...remindable.filter((g) => g.done)].map((g) => ({ habitId: g.habitId, name: g.name })),
     cues: remindable
       .filter((g) => !g.done)
       .map((g) => {
@@ -349,6 +354,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // planKey captures every field of plan.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planKey]);
+
+  // Home-screen widget: keep its header (level, streak) current and redraw it on any change.
+  const widgetKey = player ? `${today}|${player.state.level}|${player.state.streak}|${player.state.today.cleared}|${player.state.today.kept}|${habitCount}` : null;
+  useEffect(() => {
+    if (!player || !widgetKey) return;
+    saveSnapshot({ day: player.today, level: player.state.level, streak: player.state.streak, test: isTestWorld() });
+    refreshWidget();
+    // widgetKey captures every field the widget shows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widgetKey]);
+
+  // Notification buttons pressed while the app is open.
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((r) => {
+      if (r.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) handleNotificationAction(r);
+    });
+    return () => sub.remove();
+  }, []);
 
   return <PlayerContext value={player}>{children}</PlayerContext>;
 }

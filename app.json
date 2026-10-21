@@ -2,7 +2,7 @@
   "expo": {
     "name": "Questline",
     "slug": "questline",
-    "version": "0.3.0",
+    "version": "0.6.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "questline",
@@ -42,7 +42,30 @@
       ],
       "expo-secure-store",
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      [
+        "react-native-android-widget",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/rajdhani/700Bold/Rajdhani_700Bold.ttf",
+            "./node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf"
+          ],
+          "widgets": [
+            {
+              "name": "DailyQuest",
+              "label": "Daily Quest",
+              "description": "Today's quests. Tap a circle to clear one.",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "previewImage": "./assets/images/widget-preview.png",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

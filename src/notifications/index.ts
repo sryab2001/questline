@@ -1,6 +1,16 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { NOTIFICATION_TASK } from '@/background';
+import {
+  DAILY_CATEGORY,
+  DONE_ACTION_PREFIX,
+  QUIET_CHANNEL,
+  URGENT_CATEGORY,
+  URGENT_DONE_ACTION,
+  warningId,
+} from '@/quick/today';
+
 const CHANNEL_ID = 'system';
 /** Warnings are scheduled this many days ahead, in case the app isn't opened. */
 const WARNING_DAYS_AHEAD = 7;
@@ -27,6 +37,14 @@ export function setupNotifications(): Promise<boolean> {
         lightColor: '#5cd0ff',
         vibrationPattern: [0, 120, 80, 120],
       });
+      // Confirmations after a notification or widget button ("Push-ups cleared"): no sound.
+      await Notifications.setNotificationChannelAsync(QUIET_CHANNEL, {
+        name: 'Confirmations',
+        description: 'Quiet notes after clearing a quest from a notification',
+        importance: Notifications.AndroidImportance.LOW,
+      });
+      // Notification buttons run here when the app is in the background or closed.
+      await Notifications.registerTaskAsync(NOTIFICATION_TASK).catch(() => {});
     }
     const current = await Notifications.getPermissionsAsync();
     if (current.granted) return true;
@@ -57,8 +75,13 @@ export interface ReminderPlan {
   /** The last missed day was a Slip: missing today makes it a Failure. */
   streakAtRisk: boolean;
   /** Upcoming Urgent Quests: when each appears and what it asks. */
-  urgent: { at: number; text: string }[];
+  urgent: { at: number; text: string; day: string; challengeId: string }[];
+  /** Quests to offer as "✓" buttons (unfinished first); Android shows at most three. */
+  quick: { habitId: string; name: string }[];
 }
+
+/** YYYY-MM-DD of a Date on the phone's clock. */
+const localDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /** Replaces every scheduled reminder with a fresh set built from the current state. */
 export async function syncReminders(plan: ReminderPlan, now = new Date()) {
@@ -66,8 +89,21 @@ export async function syncReminders(plan: ReminderPlan, now = new Date()) {
   await Notifications.cancelAllScheduledNotificationsAsync();
   if (!plan.hasHabits) return;
 
+  // "✓ Push-ups" buttons: clear a quest straight from the notification.
+  const buttons = plan.quick.slice(0, 3).map((q) => ({
+    identifier: `${DONE_ACTION_PREFIX}${q.habitId}`,
+    buttonTitle: `✓ ${q.name}`,
+    options: { opensAppToForeground: false },
+  }));
+  if (buttons.length > 0) await Notifications.setNotificationCategoryAsync(DAILY_CATEGORY, buttons);
+  await Notifications.setNotificationCategoryAsync(URGENT_CATEGORY, [
+    { identifier: URGENT_DONE_ACTION, buttonTitle: '✓ DONE', options: { opensAppToForeground: false } },
+  ]);
+  const category = buttons.length > 0 ? DAILY_CATEGORY : undefined;
+
   await Notifications.scheduleNotificationAsync({
     content: {
+      categoryIdentifier: category,
       title: '[Daily Quest has arrived]',
       body: plan.cues.length
         ? plan.cues.slice(0, 3).join(' · ')
@@ -90,7 +126,10 @@ export async function syncReminders(plan: ReminderPlan, now = new Date()) {
     if (i === 0 && (plan.todayTotal === 0 || remaining === 0 || plan.restedToday)) continue;
 
     await Notifications.scheduleNotificationAsync({
+      // Named by date so clearing the last quest from a button can cancel it.
+      identifier: warningId(localDay(at)),
       content: {
+        categoryIdentifier: category,
         title: 'WARNING',
         body:
           i === 0
@@ -106,7 +145,12 @@ export async function syncReminders(plan: ReminderPlan, now = new Date()) {
   // Urgent Quests: one notification when each appears (they are optional; no follow-ups).
   for (const u of plan.urgent) {
     await Notifications.scheduleNotificationAsync({
-      content: { title: '[URGENT QUEST]', body: `${u.text}. 45 minutes. Optional: bonus EXP, gold and a chance of loot.` },
+      content: {
+        title: '[URGENT QUEST]',
+        body: `${u.text}. Optional: bonus EXP, gold and a chance of loot.`,
+        categoryIdentifier: URGENT_CATEGORY,
+        data: { day: u.day, challengeId: u.challengeId },
+      },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(u.at), channelId: CHANNEL_ID },
     });
   }

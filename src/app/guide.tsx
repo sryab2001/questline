@@ -53,6 +53,13 @@ const SECTIONS: { title: string; body: string[] }[] = [
     ],
   },
   {
+    title: 'FROM THE HOME SCREEN',
+    body: [
+      'Add the Daily Quest widget (long-press your home screen → Widgets → Questline). Tap a circle to clear a quest without opening the app; tap anywhere else to open it.',
+      'Morning and evening notifications carry "✓" buttons for up to three quests, and Urgent Quests a "✓ DONE". Clearing your last quest this way cancels that evening’s warning.',
+    ],
+  },
+  {
     title: 'NEVER MISS TWICE',
     body: [
       `Missing one day barely affects habit formation; long gaps do. So a first miss is a Slip: ${pct(SLIP_PENALTY_FACTOR)} of the penalty and your streak survives. Miss again the next day and it is a Failure: full penalty, streak reset.`,

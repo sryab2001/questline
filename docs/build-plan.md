@@ -158,9 +158,10 @@ Also shipped in this round: app icon and splash, Awakening onboarding, history c
 - **Unlocks** (free permissions when the Daily Quest is kept) and **Bounties** (real rewards committed in advance to a chapter or quest).
 - Grounded in the research in docs/behavior-design.md: informational over controlling rewards, visible progress, goal gradient, experiential rewards, temptation bundling. No server migration needed.
 
-### Phase 6: Android extras (2–3 days)
-- Home-screen widget showing today's quests.
-- "Mark done" action straight from the notification.
+### Phase 6: Android extras (2–3 days) ✅
+- Home-screen widget (`react-native-android-widget`; `expo-widgets` is iOS-only in SDK 57) showing today's quests with a clear button per quest. It reads the database headless, refreshes every 30 minutes and whenever the app changes, and keeps its header (level, streak) from the last app snapshot.
+- "✓ <quest>" buttons on the morning and evening notifications (up to three), "✓ DONE" on Urgent Quests. Handled by an `expo-task-manager` background task when the app is closed, and by a listener when it's open. Marking done is idempotent, and clearing the last quest cancels that evening's warning.
+- New app entry `index.ts` registers the widget handler and the background task before the router loads.
 
 ## 6. Deployment
 

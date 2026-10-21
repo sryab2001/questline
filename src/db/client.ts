@@ -38,6 +38,15 @@ export const db = new Proxy({} as Db, {
   },
 });
 
+/** Small key/value store outside both worlds (e.g. the home-screen widget's snapshot). */
+export function readMeta(key: string): string | null {
+  return meta.getFirstSync<{ value: string }>('SELECT value FROM kv WHERE key = ?', key)?.value ?? null;
+}
+
+export function writeMeta(key: string, value: string) {
+  meta.runSync('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', key, value);
+}
+
 export function currentWorld(): World {
   return world;
 }
