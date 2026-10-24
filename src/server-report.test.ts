@@ -27,10 +27,20 @@ const g = globalThis as Record<string, unknown>;
 g.BadRequestError = BadRequestError;
 g.TooManyrequestsError = TooManyrequestsError;
 g.$os = { getenv: (k: string) => env[k] ?? '' };
+// A fake Groq: model list, and chat that only knows the models in `available`.
+let available: string[];
+let reply: string;
 g.$http = {
-  send: (req: { url: string; body: string; headers: Record<string, string> }) => {
+  send: (req: { url: string; method?: string; body: string; headers: Record<string, string> }) => {
     sent.push(req);
-    return { statusCode: 200, json: { choices: [{ message: { content: ' VERDICT: Strong week. ' } }] } };
+    if (req.url.endsWith('/models')) {
+      return { statusCode: 200, json: { data: available.map((id) => ({ id, active: true })) } };
+    }
+    const model = JSON.parse(req.body).model;
+    if (!available.includes(model)) {
+      return { statusCode: 404, json: { error: { message: `The model \`${model}\` does not exist or you do not have access to it.` } } };
+    }
+    return { statusCode: 200, json: { choices: [{ message: { content: reply } }] } };
   },
 };
 // Only the filters the hook uses: owner match, and day >= for logs.
@@ -62,6 +72,8 @@ const day = (i: number) => `2026-10-${String(10 + i).padStart(2, '0')}`;
 
 beforeEach(() => {
   sent = [];
+  available = ['llama-3.3-70b-versatile', 'whisper-large-v3'];
+  reply = ' VERDICT: Strong week. ';
   env = { GROQ_API_KEY: 'test-key' };
   db = {
     day_results: Array.from({ length: 10 }, (_, i) =>
@@ -113,6 +125,26 @@ describe('server weekly report hook', () => {
     expect(sent[0].headers.authorization).toBe('Bearer test-key');
     expect(JSON.parse(sent[0].body).messages[1].content).toContain('Push-ups');
     expect(() => report.generateFor('u1')).toThrow(TooManyrequestsError);
+  });
+
+  it('falls back to a chat model the key can use, and strips hidden reasoning', () => {
+    // The model list a real key returned (2026-10-24).
+    available = ['openai/gpt-oss-safeguard-20b', 'canopylabs/orpheus-v1-english', 'meta-llama/llama-prompt-guard-2-86m', 'whisper-large-v3', 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+    reply = '<think>The player kept 2 days...</think>' + String.fromCharCode(10) + 'VERDICT: Hold the line.';
+    const r = report.generateFor('u1');
+    expect(r.model).toBe('openai/gpt-oss-120b');
+    expect(r.body).toBe('VERDICT: Hold the line.');
+    expect(sent.map((x) => (x.url.endsWith('/models') ? 'models' : JSON.parse(x.body).model))).toEqual([
+      'llama-3.3-70b-versatile',
+      'models',
+      'openai/gpt-oss-120b',
+    ]);
+  });
+
+  it('uses GROQ_MODEL when set', () => {
+    env.GROQ_MODEL = 'qwen/qwen3.8-27b';
+    available = ['qwen/qwen3.8-27b'];
+    expect(report.generateFor('u1').model).toBe('qwen/qwen3.8-27b');
   });
 
   it('explains when the key is missing or history is too short', () => {

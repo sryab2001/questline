@@ -128,11 +128,29 @@ const SYSTEM_PROMPT = [
   'No medical, legal or financial advice. No emojis.',
 ].join('\n');
 
-function writeReport(summary) {
-  const key = env('GROQ_API_KEY', '');
-  if (!key) throw new BadRequestError('The AI report is not set up on this server yet (GROQ_API_KEY is missing).');
-  const model = env('GROQ_MODEL', DEFAULT_MODEL);
+/** Preferred general chat models, best first; used when the configured one isn't available. */
+const PREFERRED = [/gpt-oss-120b/, /llama-3\.3-70b/, /llama-4/, /qwen/, /gpt-oss/, /llama/, /mistral|gemma|kimi|deepseek/];
+const NOT_CHAT = /whisper|tts|guard|playai|orpheus|embed|vision-only|distil/i;
+
+/** Picks a chat model this key can use, from the provider's model list. */
+function pickModel(key) {
   const res = $http.send({
+    url: env('AI_API_URL', DEFAULT_URL).replace(/\/chat\/completions$/, '/models'),
+    method: 'GET',
+    timeout: 20,
+    headers: { authorization: 'Bearer ' + key },
+  });
+  if (res.statusCode !== 200 || !res.json || !res.json.data) return null;
+  const ids = res.json.data.filter((m) => m.active !== false && !NOT_CHAT.test(m.id)).map((m) => m.id);
+  for (const re of PREFERRED) {
+    const hit = ids.find((id) => re.test(id));
+    if (hit) return hit;
+  }
+  return ids[0] || null;
+}
+
+function chat(key, model, summary) {
+  return $http.send({
     url: env('AI_API_URL', DEFAULT_URL),
     method: 'POST',
     timeout: 60,
@@ -140,19 +158,37 @@ function writeReport(summary) {
     body: JSON.stringify({
       model: model,
       temperature: 0.6,
-      max_tokens: 500,
+      max_tokens: 900,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: 'Weekly data:\n' + JSON.stringify(summary) },
+        { role: 'user', content: 'Weekly data:' + String.fromCharCode(10) + JSON.stringify(summary) },
       ],
     }),
   });
-  if (res.statusCode !== 200) {
-    const msg = res.json && res.json.error && res.json.error.message ? res.json.error.message : 'HTTP ' + res.statusCode;
-    throw new BadRequestError('The AI service refused the request: ' + msg);
+}
+
+const errorText = (res) => (res.json && res.json.error && res.json.error.message ? res.json.error.message : 'HTTP ' + res.statusCode);
+
+function writeReport(summary) {
+  const key = env('GROQ_API_KEY', '');
+  if (!key) throw new BadRequestError('The AI report is not set up on this server yet (GROQ_API_KEY is missing).');
+  let model = env('GROQ_MODEL', DEFAULT_MODEL);
+  let res = chat(key, model, summary);
+  // The configured model isn't offered to this key (providers retire and rename models):
+  // pick one that is, so the report keeps working without a config change.
+  if (res.statusCode === 404 || (res.statusCode === 400 && /model/i.test(errorText(res)))) {
+    const fallback = pickModel(key);
+    if (fallback && fallback !== model) {
+      model = fallback;
+      res = chat(key, model, summary);
+    }
   }
-  const text = res.json.choices[0].message.content;
-  return { model: model, text: String(text).trim() };
+  if (res.statusCode !== 200) throw new BadRequestError('The AI service refused the request: ' + errorText(res));
+  const raw = String(res.json.choices[0].message.content || '');
+  // Some models (e.g. Qwen) put their hidden reasoning in <think> tags before the answer.
+  const text = raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  if (!text) throw new BadRequestError('The AI service returned an empty report. Try again, or set GROQ_MODEL to another model.');
+  return { model: model, text: text };
 }
 
 function save(userId, through, report) {
