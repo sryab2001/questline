@@ -1,0 +1,41 @@
+# On every push to main: if the native fingerprint has a matching preview build,
+# ship the change over the air; otherwise (native code changed) build a new APK.
+name: Build or update (Android preview)
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  fingerprint:
+    name: Fingerprint native code
+    type: fingerprint
+    environment: preview
+
+  get_android_build:
+    name: Find a build with this fingerprint
+    needs: [fingerprint]
+    type: get-build
+    params:
+      platform: android
+      profile: preview
+      fingerprint_hash: ${{ needs.fingerprint.outputs.android_fingerprint_hash }}
+
+  build_android:
+    name: Build APK (native code changed)
+    needs: [get_android_build]
+    if: ${{ !needs.get_android_build.outputs.build_id }}
+    type: build
+    params:
+      platform: android
+      profile: preview
+
+  publish_android_update:
+    name: Publish update (JS only)
+    needs: [get_android_build]
+    if: ${{ needs.get_android_build.outputs.build_id }}
+    type: update
+    environment: preview
+    params:
+      channel: preview
+      platform: android
