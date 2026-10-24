@@ -149,21 +149,34 @@ function pickModel(key) {
   return ids[0] || null;
 }
 
+/** Keep reasoning models brief, so the token budget goes to the report itself. */
+function reasoningParams(model) {
+  if (/gpt-oss/.test(model)) return { reasoning_effort: 'low' };
+  if (/qwen/.test(model)) return { reasoning_format: 'hidden' };
+  return {};
+}
+
 function chat(key, model, summary) {
   return $http.send({
     url: env('AI_API_URL', DEFAULT_URL),
     method: 'POST',
     timeout: 60,
     headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
-    body: JSON.stringify({
-      model: model,
-      temperature: 0.6,
-      max_tokens: 900,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: 'Weekly data:' + String.fromCharCode(10) + JSON.stringify(summary) },
-      ],
-    }),
+    body: JSON.stringify(
+      Object.assign(
+        {
+          model: model,
+          temperature: 0.6,
+          // Reasoning models spend tokens thinking before they answer; leave room for both.
+          max_tokens: 2000,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: 'Weekly data:' + String.fromCharCode(10) + JSON.stringify(summary) },
+          ],
+        },
+        reasoningParams(model),
+      ),
+    ),
   });
 }
 

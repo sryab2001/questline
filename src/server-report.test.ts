@@ -121,6 +121,7 @@ describe('server weekly report hook', () => {
   it('writes and stores a report, then rate-limits manual requests', () => {
     const r = report.generateFor('u1');
     expect(r).toMatchObject({ through: day(9), body: 'VERDICT: Strong week.', model: 'llama-3.3-70b-versatile' });
+    expect(JSON.parse(sent[0].body).reasoning_effort).toBeUndefined();
     expect(sent[0].url).toBe('https://api.groq.com/openai/v1/chat/completions');
     expect(sent[0].headers.authorization).toBe('Bearer test-key');
     expect(JSON.parse(sent[0].body).messages[1].content).toContain('Push-ups');
@@ -141,10 +142,17 @@ describe('server weekly report hook', () => {
     ]);
   });
 
-  it('uses GROQ_MODEL when set', () => {
-    env.GROQ_MODEL = 'qwen/qwen3.8-27b';
-    available = ['qwen/qwen3.8-27b'];
-    expect(report.generateFor('u1').model).toBe('qwen/qwen3.8-27b');
+  it('uses GROQ_MODEL when set, keeping reasoning models brief', () => {
+    env.GROQ_MODEL = 'openai/gpt-oss-20b';
+    available = ['openai/gpt-oss-20b'];
+    expect(report.generateFor('u1').model).toBe('openai/gpt-oss-20b');
+    expect(JSON.parse(sent[0].body)).toMatchObject({ reasoning_effort: 'low', max_tokens: 2000 });
+  });
+
+  it('refuses to store an empty report', () => {
+    reply = '<think>only thinking, no answer</think>';
+    expect(() => report.generateFor('u1')).toThrow(/empty report/);
+    expect(db.reports).toHaveLength(0);
   });
 
   it('explains when the key is missing or history is too short', () => {
