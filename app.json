@@ -2,7 +2,7 @@
   "expo": {
     "name": "Questline",
     "slug": "questline",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "questline",
@@ -76,6 +76,12 @@
       "eas": {
         "projectId": "69056a4b-fcde-41e9-a9cc-abb87325e9eb"
       }
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/69056a4b-fcde-41e9-a9cc-abb87325e9eb"
     }
   }
 }

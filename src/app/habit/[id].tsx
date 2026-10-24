@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { Alert, AppState, KeyboardAvoidingView, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Chip } from '@/components/chip';
@@ -8,12 +8,15 @@ import { ScreenHeader } from '@/components/screen-header';
 import { SysButton } from '@/components/sys-button';
 import { SysText } from '@/components/sys-text';
 import { SystemWindow } from '@/components/system-window';
-import { addHabits, deleteHabit, getHabit, type HabitInput, updateHabit } from '@/db/actions';
+import { addHabits, deleteHabit, getHabit, type HabitInput, recordScreenTime, updateHabit } from '@/db/actions';
 import { GOAL_XP, type Grade, GRADES, type Stat, STAT_INFO, STATS } from '@/engine';
+import { hasUsageAccess, openUsageAccessSettings, screenTimeAvailable } from '@/screen-time';
 import { colors, fonts } from '@/theme';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const LIMIT_PRESETS = [60, 120, 180, 240];
+const limitName = (minutes: number) => `Phone under ${minutes % 60 === 0 ? `${minutes / 60} h` : `${minutes} min`}`;
 
 export default function HabitEditor() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,6 +34,17 @@ export default function HabitEditor() {
   const [place, setPlace] = useState('');
   const [bundle, setBundle] = useState('');
   const [minTarget, setMinTarget] = useState('');
+  /** Limit Quest: kept by staying under a daily screen-time limit. */
+  const [limit, setLimit] = useState(false);
+  const [access, setAccess] = useState(hasUsageAccess);
+
+  // Coming back from the Usage access settings page: check again.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') setAccess(hasUsageAccess());
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (isNew) return;
@@ -47,35 +61,61 @@ export default function HabitEditor() {
       setPlace(h.place);
       setBundle(h.bundle);
       setMinTarget(h.minTarget ? String(h.minTarget) : '');
+      setLimit(h.limitSource === 'screen_time');
       setLoaded(true);
     });
   }, [id, isNew]);
 
-  const targetNum = simple ? 1 : Number(target.replace(',', '.'));
-  const minNum = minTarget.trim() ? Number(minTarget.replace(',', '.')) : null;
+  const targetNum = simple && !limit ? 1 : Number(target.replace(',', '.'));
+  const minNum = minTarget.trim() && !limit ? Number(minTarget.replace(',', '.')) : null;
   const minValid = minNum === null || (Number.isFinite(minNum) && minNum > 0 && minNum < targetNum);
   const valid =
-    name.trim().length > 0 && Number.isFinite(targetNum) && targetNum > 0 && minValid && (days === 'daily' || days.length > 0);
+    name.trim().length > 0 &&
+    Number.isFinite(targetNum) &&
+    targetNum > 0 &&
+    minValid &&
+    (days === 'daily' || days.length > 0) &&
+    (!limit || access);
 
   const what = name.trim() || 'this quest';
   const action = simple ? what.toLowerCase() : [`do ${target}`, unit.trim(), `of ${what}`].filter(Boolean).join(' ');
   const triggerLine = `After I ${cue.trim()}, I will ${action}${place.trim() ? ` (${place.trim()})` : ''}.`;
+
+  const chooseKind = (asLimit: boolean) => {
+    setLimit(asLimit);
+    if (asLimit) {
+      setSimple(false);
+      setUnit('min');
+      if (!LIMIT_PRESETS.includes(Number(target))) setTarget('180');
+      if (!name.trim()) setName(limitName(180));
+      setStat('SENSE');
+      setGrade('C');
+    }
+  };
+
+  const setLimitMinutes = (m: number) => {
+    // Keep an auto-generated name in step with the limit; leave a custom name alone.
+    if (!name.trim() || name === limitName(Number(target))) setName(limitName(m));
+    setTarget(String(m));
+  };
 
   const save = async () => {
     const input: HabitInput = {
       name: name.trim(),
       stat,
       target: targetNum,
-      unit: simple ? '' : unit.trim(),
+      unit: limit ? 'min' : simple ? '' : unit.trim(),
+      limitSource: limit ? 'screen_time' : '',
       grade,
       schedule: days === 'daily' ? 'daily' : [...days].sort().join(','),
       cue: cue.trim(),
       place: place.trim(),
       bundle: bundle.trim(),
-      minTarget: simple ? null : minNum,
+      minTarget: simple || limit ? null : minNum,
     };
     if (isNew) await addHabits([input]);
     else await updateHabit(id, input);
+    if (limit) await recordScreenTime();
     router.back();
   };
 
@@ -106,6 +146,32 @@ export default function HabitEditor() {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <ScreenHeader title={isNew ? 'NEW QUEST' : 'EDIT QUEST'} />
           <SystemWindow title="QUEST SETUP">
+            {screenTimeAvailable() ? (
+              <Field label="KIND">
+                <View style={styles.wrap}>
+                  <Chip label="Do something" selected={!limit} onPress={() => chooseKind(false)} />
+                  <Chip label="Screen-time limit" selected={limit} onPress={() => chooseKind(true)} accent={colors.epic} />
+                </View>
+              </Field>
+            ) : null}
+            {limit ? (
+              <View style={[styles.limitBox, access && { borderColor: colors.epic }]}>
+                <SysText style={{ fontSize: 13, lineHeight: 19, color: colors.text }}>
+                  Kept by staying under a daily limit of total phone time. Usage is read from Android, on this phone only;
+                  nothing to log.
+                </SysText>
+                {access ? (
+                  <SysText style={{ fontSize: 12, color: colors.epic }}>Usage access granted.</SysText>
+                ) : (
+                  <>
+                    <SysText style={{ fontSize: 12, color: colors.dangerSoft }}>
+                      Needs Usage access: find Questline in the list and allow it.
+                    </SysText>
+                    <SysButton label="GRANT USAGE ACCESS" variant="ghost" onPress={() => openUsageAccessSettings()} />
+                  </>
+                )}
+              </View>
+            ) : null}
             <Field label="NAME">
               <TextInput
                 value={name}
@@ -126,7 +192,24 @@ export default function HabitEditor() {
               </View>
             </Field>
 
-            <View style={styles.switchRow}>
+            {limit ? (
+              <Field label="DAILY LIMIT" hint={`${target} min`}>
+                <View style={styles.wrap}>
+                  {LIMIT_PRESETS.map((m) => (
+                    <Chip key={m} label={m % 60 === 0 ? `${m / 60} h` : `${m} min`} selected={Number(target) === m} onPress={() => setLimitMinutes(m)} />
+                  ))}
+                </View>
+                <TextInput
+                  value={target}
+                  onChangeText={(t) => setLimitMinutes(Number(t.replace(/[^0-9]/g, '')) || 0)}
+                  keyboardType="number-pad"
+                  style={styles.input}
+                  accessibilityLabel="Daily limit in minutes"
+                />
+              </Field>
+            ) : null}
+
+            <View style={[styles.switchRow, limit && { display: 'none' }]}>
               <View style={{ flex: 1 }}>
                 <SysText style={{ fontSize: 14, color: colors.text }}>Simple check</SysText>
                 <SysText variant="caption">Done or not done, no amount</SysText>
@@ -140,7 +223,7 @@ export default function HabitEditor() {
               />
             </View>
 
-            {!simple ? (
+            {!simple && !limit ? (
               <View style={styles.wrap}>
                 <Field label="TARGET" style={{ flex: 1 }}>
                   <TextInput
@@ -187,6 +270,7 @@ export default function HabitEditor() {
             </Field>
           </SystemWindow>
 
+          {!limit ? (
           <SystemWindow title="TRIGGER">
             <SysText variant="caption" style={{ lineHeight: 18 }}>
               Tie the quest to something you already do. If-then plans make follow-through much more likely, and the cue,
@@ -214,7 +298,9 @@ export default function HabitEditor() {
             </Field>
             {cue.trim() ? <SysText style={styles.preview}>{triggerLine}</SysText> : null}
           </SystemWindow>
+          ) : null}
 
+          {!limit ? (
           <SystemWindow title="BAD DAYS">
             {!simple ? (
               <Field label="MINIMUM CLEAR" hint="Keeps your streak">
@@ -241,6 +327,7 @@ export default function HabitEditor() {
               />
             </Field>
           </SystemWindow>
+          ) : null}
 
           <SysButton label={isNew ? 'ACCEPT QUEST' : 'SAVE'} onPress={save} disabled={!valid} />
           {!isNew ? <SysButton label="DELETE QUEST" variant="ghost" onPress={remove} /> : null}
@@ -280,4 +367,5 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   preview: { fontSize: 13, lineHeight: 20, color: colors.cyan, fontFamily: fonts.bodyMedium },
+  limitBox: { gap: 8, borderWidth: 1, borderColor: colors.dangerSoft, padding: 10 },
 });

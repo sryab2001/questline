@@ -22,6 +22,11 @@ export interface Habit {
   minTarget?: number | null;
   /** Became a Passive Skill. */
   mastered?: boolean;
+  /**
+   * Limit Quest: kept by staying at or under `target` (e.g. screen-time minutes).
+   * A day with no reading at all doesn't count either way.
+   */
+  limit?: boolean;
   // Display-only metadata (ignored by the engine).
   cue?: string;
   place?: string;
@@ -144,6 +149,8 @@ export interface GoalProgress {
   min: boolean;
   mastered: boolean;
   weakened: boolean;
+  /** Limit Quest: `progress` is what was used; `done` means still under the limit. */
+  limit: boolean;
 }
 
 /**
@@ -268,6 +275,11 @@ export interface HabitRecord {
   name: string;
   unit: string;
   target: number;
+  /** Limit Quest: totals are usage, shown as daily averages; no milestones. */
+  limit: boolean;
+  /** Days with a reading in the last 30 / previous 30 days (for averages). */
+  daysLast30: number;
+  daysPrev30: number;
   /** Sum of everything logged (days kept, for yes/no quests). */
   total: number;
   daysDone: number;

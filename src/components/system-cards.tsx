@@ -30,7 +30,7 @@ import {
   weekday,
 } from '@/engine';
 import type { PlayerData } from '@/hooks/use-player-state';
-import { playSound } from '@/sound';
+import { playEvent, playSound } from '@/sound';
 import { colors, fonts } from '@/theme';
 
 import { RARITY_COLOR } from './gain-toast';
@@ -200,7 +200,7 @@ export function MasteryCard({ habit }: { habit: Habit }) {
 
   const accept = async () => {
     await acceptMastery(habit.id, skill || `${habit.name} Mastery`, title || IDENTITY_TITLES[habit.stat]);
-    playSound('levelup');
+    playEvent('arise');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   };
 

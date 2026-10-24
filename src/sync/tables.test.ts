@@ -32,6 +32,7 @@ describe('toRemote', () => {
         masteredAt: null,
         masteryName: '',
         masteryTitle: '',
+        limitSource: '',
       },
       USER,
     );
@@ -57,6 +58,7 @@ describe('toRemote', () => {
       mastered_at: 0,
       mastery_name: '',
       mastery_title: '',
+      limit_source: '',
     });
     expect(body).not.toHaveProperty('dirty');
   });
@@ -173,6 +175,7 @@ describe('toLocal', () => {
       masteredAt: new Date(5000),
       masteryName: 'Scholar',
       masteryTitle: 'The Scholar',
+      limitSource: '',
     };
     const remote = { ...toRemote(t, original, USER), updated: 'x' } as unknown as PbRecord;
     expect(toLocal(t, remote)).toEqual(original);

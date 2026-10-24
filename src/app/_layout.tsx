@@ -72,6 +72,9 @@ function WorldRoot() {
         <Stack.Screen name="main-quest/[id]" />
         <Stack.Screen name="record" />
         <Stack.Screen name="quest-board" />
+        <Stack.Screen name="dungeon" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="routines" />
+        <Stack.Screen name="routine/[id]" />
         <Stack.Screen name="awakening" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
     </PlayerProvider>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { type Drop, GOAL_XP, GOLD_PER_GOAL, type Grade, MASTERED_XP_FACTOR, type PlayerState, URGENT_REWARD } from '@/engine';
-import { playSound } from '@/sound';
+import { playEvent, playSound } from '@/sound';
 
 export interface ClearEvent {
   key: number;
@@ -26,7 +26,8 @@ export function useClearEvents(today: PlayerState['today'] | undefined, grades: 
 
   useEffect(() => {
     if (!today) return;
-    const done = new Set(today.goals.filter((g) => g.done).map((g) => g.habitId));
+    // Limit Quests are "done" from the start of the day; they aren't cleared like quests.
+    const done = new Set(today.goals.filter((g) => g.done && !g.limit).map((g) => g.habitId));
     const before = prev.current;
     prev.current = { day: dayKey, done, urgent: today.urgentCleared };
     if (!before || before.day !== dayKey) return;
@@ -39,7 +40,7 @@ export function useClearEvents(today: PlayerState['today'] | undefined, grades: 
       return;
     }
 
-    const newly = today.goals.filter((g) => g.done && !before.done.has(g.habitId));
+    const newly = today.goals.filter((g) => g.done && !g.limit && !before.done.has(g.habitId));
     if (newly.length === 0) return;
 
     const g = newly[newly.length - 1];
@@ -48,8 +49,8 @@ export function useClearEvents(today: PlayerState['today'] | undefined, grades: 
     const drops = today.drops.filter((d) => d.source === g.habitId || (questComplete && d.source === 'clear'));
     const xp = Math.round(GOAL_XP[grades.get(g.habitId) ?? 'E'] * (g.mastered && !g.weakened ? MASTERED_XP_FACTOR : 1) * (critical ? 2 : 1));
 
-    playSound(questComplete ? 'quest' : 'clear');
-    if (drops.length) setTimeout(() => playSound('purchase'), 450);
+    playEvent(questComplete ? 'daily_complete' : 'quest_clear');
+    if (drops.length && !questComplete) setTimeout(() => playSound('purchase'), 450);
     setEvent({ key: Date.now(), name: g.name, xp, gold: GOLD_PER_GOAL, critical, drops, questComplete, comeback: today.comeback });
   }, [today, grades, dayKey]);
 

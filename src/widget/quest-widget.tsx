@@ -20,6 +20,7 @@ const C = {
   textDone: '#7fa3bb',
   gold: '#ffc857',
   epic: '#b98cff',
+  danger: '#ff7a87',
 } as const;
 
 const DISPLAY = 'Rajdhani_700Bold';
@@ -54,9 +55,9 @@ export function QuestWidget({ goals, snapshot, height }: QuestWidgetProps) {
   const cleared = goals.filter((g) => g.done).length;
   const kept = goals.length > 0 && goals.every((g) => g.done || g.min);
   const rowsThatFit = Math.max(1, Math.floor((height - HEADER_HEIGHT - 16) / ROW_HEIGHT));
-  const open = goals.filter((g) => !g.done);
-  // Unfinished quests first, so the ones you can still tap are always visible.
-  const ordered = [...open, ...goals.filter((g) => g.done)];
+  const open = goals.filter((g) => !g.done && !g.limit);
+  // Quests you can still tap first, then Limit Quests (usage), then cleared ones.
+  const ordered = [...open, ...goals.filter((g) => g.limit), ...goals.filter((g) => g.done && !g.limit)];
   const shown = ordered.slice(0, goals.length > rowsThatFit ? rowsThatFit - 1 : rowsThatFit);
   const hidden = goals.length - shown.length;
 
@@ -108,11 +109,21 @@ export function QuestWidget({ goals, snapshot, height }: QuestWidgetProps) {
             <TextWidget text={g.name} truncate="END" maxLines={1} style={{ fontFamily: BODY, fontSize: 13, color: g.done ? C.textDone : C.text }} />
           </FlexWidget>
           <TextWidget
-            text={g.done ? 'CLEAR' : g.target > 1 || g.unit ? `${fmt(g.progress)}/${fmt(g.target)}${g.unit ? ` ${g.unit}` : ''}` : g.min ? 'MIN' : ''}
-            style={{ fontFamily: DISPLAY, fontSize: 12, color: g.done ? C.gold : g.min ? C.epic : C.textMuted, marginRight: 6 }}
+            text={
+              g.limit
+                ? `${fmt(g.progress)}/${fmt(g.target)} ${g.unit || 'min'}`
+                : g.done
+                  ? 'CLEAR'
+                  : g.target > 1 || g.unit
+                    ? `${fmt(g.progress)}/${fmt(g.target)}${g.unit ? ` ${g.unit}` : ''}`
+                    : g.min
+                      ? 'MIN'
+                      : ''
+            }
+            style={{ fontFamily: DISPLAY, fontSize: 12, color: g.limit ? (g.done ? C.epic : C.danger) : g.done ? C.gold : g.min ? C.epic : C.textMuted, marginRight: 6 }}
           />
           <FlexWidget
-            clickAction={g.done ? 'OPEN_APP' : 'MARK_DONE'}
+            clickAction={g.done || g.limit ? 'OPEN_APP' : 'MARK_DONE'}
             clickActionData={{ habitId: g.habitId }}
             accessibilityLabel={g.done ? `${g.name} cleared` : `Clear ${g.name}`}
             style={{
@@ -123,7 +134,10 @@ export function QuestWidget({ goals, snapshot, height }: QuestWidgetProps) {
               borderLeftWidth: 1,
               borderLeftColor: C.muted,
             }}>
-            <TextWidget text={g.done ? '✓' : '○'} style={{ fontFamily: DISPLAY, fontSize: 18, color: g.done ? C.gold : C.cyan }} />
+            <TextWidget
+              text={g.limit ? (g.done ? '◔' : '✕') : g.done ? '✓' : '○'}
+              style={{ fontFamily: DISPLAY, fontSize: 18, color: g.limit ? (g.done ? C.epic : C.danger) : g.done ? C.gold : C.cyan }}
+            />
           </FlexWidget>
         </FlexWidget>
       ))}

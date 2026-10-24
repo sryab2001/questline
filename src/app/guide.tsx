@@ -53,6 +53,20 @@ const SECTIONS: { title: string; body: string[] }[] = [
     ],
   },
   {
+    title: 'LIMIT QUESTS',
+    body: [
+      'A Limit Quest is kept by staying under a limit instead of reaching a target: "Phone under 3 h". Questline reads your total screen time from Android (Usage access, on this phone only), so there is nothing to log.',
+      'Today shows how much of the limit is left. The day is judged when it closes, on the real usage. A day with no reading, for example if access is turned off, counts neither way.',
+    ],
+  },
+  {
+    title: 'DUNGEONS & ROUTINES',
+    body: [
+      'Enter a Dungeon from any quest measured in minutes or hours: one task, a countdown, and the minutes are logged when the gate closes. You can leave the app; the time still counts.',
+      'A Routine chains quests you do back to back ("water → push-ups → meditate"). Each step is the cue for the next, and a run takes one tap per step.',
+    ],
+  },
+  {
     title: 'FROM THE HOME SCREEN',
     body: [
       'Add the Daily Quest widget (long-press your home screen → Widgets → Questline). Tap a circle to clear a quest without opening the app; tap anywhere else to open it.',

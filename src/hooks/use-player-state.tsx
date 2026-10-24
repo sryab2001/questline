@@ -7,6 +7,8 @@ import {
   checkinsQuery,
   classQuestsQuery,
   closePendingDays,
+  recordScreenTime,
+  routinesQuery,
   dayResultsQuery,
   eventsQuery,
   habitsQuery,
@@ -44,6 +46,7 @@ import {
 } from '@/engine';
 import * as Notifications from 'expo-notifications';
 
+import { claimFinishedDungeon } from '@/dungeon';
 import { syncReminders } from '@/notifications';
 import { handleNotificationAction, saveSnapshot } from '@/quick/today';
 import { setSoundEnabled } from '@/sound';
@@ -122,6 +125,13 @@ export interface PlayerData {
   /** Upcoming Urgent Quests (today and the next days) that still need a notification. */
   urgentSchedule: { at: number; text: string; day: string; challengeId: string }[];
   mainQuests: MainQuestRow[];
+  routines: RoutineRow[];
+}
+
+export interface RoutineRow {
+  id: string;
+  name: string;
+  habitIds: string[];
 }
 
 const PlayerContext = createContext<PlayerData | null>(null);
@@ -141,6 +151,7 @@ function useComputePlayer(): PlayerData | null {
   const { data: checkinRows } = useLiveQuery(checkinsQuery());
   const { data: eventRows } = useLiveQuery(eventsQuery());
   const { data: classRows } = useLiveQuery(classQuestsQuery());
+  const { data: routineRows } = useLiveQuery(routinesQuery());
   const now = useNow();
 
   const player = useMemo((): PlayerData | null => {
@@ -169,6 +180,7 @@ function useComputePlayer(): PlayerData | null {
     const ordered = [...eventRows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     const data = (e: (typeof eventRows)[number]) => (e.dataJson ? JSON.parse(e.dataJson) : {});
     const mainQuests: MainQuestRow[] = classRows.map((q) => ({ id: q.id, name: q.name, data: parseMainQuest(q.stepsJson) }));
+    const routines: RoutineRow[] = routineRows.map((r) => ({ id: r.id, name: r.name, habitIds: JSON.parse(r.habitIdsJson) as string[] }));
     // Economy v2 starts on the earliest recorded cutover (one per device that upgraded).
     const economyDays = eventRows.filter((e) => e.kind === 'economy').map((e) => e.day).sort();
 
@@ -267,8 +279,9 @@ function useComputePlayer(): PlayerData | null {
       urgent,
       urgentSchedule,
       mainQuests,
+      routines,
     };
-  }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows, now]);
+  }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows, routineRows, now]);
 
   return player;
 }
@@ -281,9 +294,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // than that. (Syncing on every local change looped: a sync's own writes count as changes.)
   useEffect(() => {
     initSync().then(() => syncNow());
-    const timer = setInterval(() => syncNow(), SYNC_INTERVAL_MS);
+    // A Dungeon whose time ran out while the app was closed pays out now.
+    claimFinishedDungeon();
+    // Screen-time Limit Quests: read usage now, on return, and with each sync tick.
+    recordScreenTime();
+    const timer = setInterval(() => {
+      recordScreenTime();
+      syncNow();
+    }, SYNC_INTERVAL_MS);
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active' && Date.now() - (getSyncStatus().lastSyncAt ?? 0) >= SYNC_INTERVAL_MS) syncNow();
+      if (s !== 'active') return;
+      claimFinishedDungeon();
+      recordScreenTime();
+      if (Date.now() - (getSyncStatus().lastSyncAt ?? 0) >= SYNC_INTERVAL_MS) syncNow();
     });
     return () => {
       clearInterval(timer);
@@ -321,7 +344,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // Keep scheduled reminders in step with today's progress and settings.
   // Passive Skills no longer need reminders: they don't count toward the warning.
-  const remindable = player?.state.today.goals.filter((g) => !g.mastered || g.weakened) ?? [];
+  // Limit Quests have nothing to "do", so they get no reminders or buttons.
+  const remindable = player?.state.today.goals.filter((g) => !g.limit && (!g.mastered || g.weakened)) ?? [];
   const plan = player && {
     morningHour: player.settings.morningHour,
     warningHour: player.settings.warningHour,

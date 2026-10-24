@@ -5,7 +5,7 @@ import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withRep
 
 import { updateSettings } from '@/db/actions';
 import { SKILLS } from '@/engine';
-import { playSound } from '@/sound';
+import { playEvent } from '@/sound';
 import { colors, fonts } from '@/theme';
 
 import { SysButton } from './sys-button';
@@ -22,7 +22,7 @@ export function LevelUpModal({ from, to, onOpenStatus }: Props) {
   const pulse = useSharedValue(0.6);
 
   useEffect(() => {
-    playSound('levelup');
+    playEvent('level_up');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     pulse.value = withRepeat(withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.sin) }), -1, true);
   }, [pulse]);

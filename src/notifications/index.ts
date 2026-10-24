@@ -86,7 +86,10 @@ const localDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).pad
 /** Replaces every scheduled reminder with a fresh set built from the current state. */
 export async function syncReminders(plan: ReminderPlan, now = new Date()) {
   if (!(await setupNotifications())) return;
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  // Replace every reminder, but leave a running Instance Dungeon's notices alone.
+  for (const n of await Notifications.getAllScheduledNotificationsAsync()) {
+    if (!n.identifier.startsWith('dungeon-')) await Notifications.cancelScheduledNotificationAsync(n.identifier);
+  }
   if (!plan.hasHabits) return;
 
   // "✓ Push-ups" buttons: clear a quest straight from the notification.

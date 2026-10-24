@@ -17,7 +17,7 @@ import {
   SLOTS,
 } from '@/engine';
 import type { PlayerData } from '@/hooks/use-player-state';
-import { playSound } from '@/sound';
+import { playEvent, playSound } from '@/sound';
 import { colors, fonts } from '@/theme';
 
 import { RARITY_COLOR } from './gain-toast';
@@ -151,7 +151,7 @@ function ForgeModal({ player, onClose }: { player: PlayerData; onClose: () => vo
 
   const forge = async () => {
     await forgeItems(picked);
-    playSound('levelup');
+    playEvent('item');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     onClose();
   };
@@ -293,9 +293,10 @@ export function RewardsModal({
   bounties: Bounty[];
 }) {
   const big = achievements.length > 0 || bounties.length > 0;
+  const event = bounties.length > 0 ? 'bounty' : achievements.length > 0 || milestones.length > 0 ? 'achievement' : 'item';
   useEffect(() => {
-    playSound(big ? 'levelup' : 'quest');
-  }, [big]);
+    playEvent(event);
+  }, [event]);
 
   const dismiss = () =>
     Promise.all([

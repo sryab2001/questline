@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GainToast } from '@/components/gain-toast';
@@ -24,7 +24,8 @@ import {
 } from '@/components/system-cards';
 import { SystemWindow } from '@/components/system-window';
 import { addHabits, logProgress, SAMPLE_HABITS } from '@/db/actions';
-import { addDays, COMEBACK_BONUS, GOLD_DAILY_CLEAR, type GoalProgress, nextResetAt, POINTS_PER_DAILY_CLEAR } from '@/engine';
+import { readDungeon } from '@/dungeon';
+import { addDays, COMEBACK_BONUS, DAY_GOLD, GOLD_DAILY_CLEAR, type GoalProgress, nextResetAt, POINTS_PER_DAILY_CLEAR } from '@/engine';
 import { useClearEvents } from '@/hooks/use-clear-events';
 import { usePlayerState } from '@/hooks/use-player-state';
 import { colors, fonts } from '@/theme';
@@ -46,6 +47,7 @@ export default function QuestsScreen() {
   if (!player) return null;
   const { state, settings, now, activeSurvival } = player;
   const unlocked = player.storeItems.filter((i) => i.kind === 'unlock').map((i) => i.name);
+  const dungeon = readDungeon();
   const openGoal = state.today.goals.find((g) => g.habitId === openId) ?? null;
 
   const onPressGoal = async (g: GoalProgress) => {
@@ -125,6 +127,18 @@ export default function QuestsScreen() {
           </SystemWindow>
         ) : null}
 
+        {dungeon ? (
+          <Pressable onPress={() => router.push('/dungeon')} accessibilityRole="button" accessibilityLabel={`In the dungeon: ${dungeon.habitName}`}>
+            <SystemWindow title="INSTANCE DUNGEON" variant="epic" pulse>
+              <SysText style={{ textAlign: 'center', fontSize: 15, color: colors.text }}>
+                {dungeon.habitName} · gate closes {new Date(dungeon.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </SysText>
+              <SysText variant="caption" style={{ textAlign: 'center' }}>
+                Tap to return
+              </SysText>
+            </SystemWindow>
+          </Pressable>
+        ) : null}
         {player.urgent?.status === 'active' ? <UrgentCard urgent={player.urgent} now={now} /> : null}
 
         {state.today.rested ? (
@@ -185,7 +199,7 @@ export default function QuestsScreen() {
                 REWARDS
               </SysText>
               <View style={styles.chips}>
-                {['Status Recovery', `+${POINTS_PER_DAILY_CLEAR} Ability Points`, `+${GOLD_DAILY_CLEAR} G`].map((r) => (
+                {['Status Recovery', `+${POINTS_PER_DAILY_CLEAR} Ability Points`, state.economyV2 ? `~${DAY_GOLD} G` : `+${GOLD_DAILY_CLEAR} G`].map((r) => (
                   <View key={r} style={styles.chip}>
                     <SysText style={[styles.chipText, r.endsWith('G') && { color: colors.gold }]}>{r}</SysText>
                   </View>
@@ -222,6 +236,31 @@ export default function QuestsScreen() {
 
         {player.habits.length > 0 ? <GateCard gate={state.gate} /> : null}
 
+        {player.routines.length > 0 ? (
+          <SystemWindow title="ROUTINES">
+            {player.routines.map((r) => {
+              const steps = r.habitIds.filter((h) => state.today.goals.some((g) => g.habitId === h));
+              const done = steps.filter((h) => state.today.goals.find((g) => g.habitId === h)?.done).length;
+              return (
+                <View key={r.id} style={styles.routineRow}>
+                  <View style={{ flex: 1 }}>
+                    <SysText style={{ fontSize: 14, color: colors.text, fontFamily: fonts.bodyMedium }}>{r.name}</SysText>
+                    <SysText variant="caption" style={{ fontSize: 11 }}>
+                      {done}/{steps.length} today
+                    </SysText>
+                  </View>
+                  <SysButton
+                    label={done === steps.length && steps.length > 0 ? 'DONE' : 'RUN'}
+                    variant={done === steps.length ? 'ghost' : 'primary'}
+                    style={{ minWidth: 80, minHeight: 40 }}
+                    onPress={() => router.push({ pathname: '/routine/[id]', params: { id: r.id } })}
+                  />
+                </View>
+              );
+            })}
+          </SystemWindow>
+        ) : null}
+
         <View style={styles.actions}>
           <SysButton
             label="+ NEW QUEST"
@@ -231,6 +270,7 @@ export default function QuestsScreen() {
           />
           <SysButton label="ALL QUESTS" variant="ghost" style={{ flex: 1 }} onPress={() => router.push('/habits')} />
         </View>
+        <SysButton label="ROUTINES" variant="ghost" onPress={() => router.push('/routines')} />
       </ScrollView>
       <GainToast event={clearEvent} />
       <LogSheet goal={openGoal} onClose={() => setOpenId(null)} />
@@ -255,6 +295,7 @@ function Meter({ label, value, max, color }: { label: string; value: number; max
 }
 
 const styles = StyleSheet.create({
+  routineRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 },
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 20, gap: 20 },
   header: { gap: 12 },

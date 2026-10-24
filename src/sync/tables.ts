@@ -40,6 +40,7 @@ export const SYNC_TABLES: SyncTable[] = [
   table('class_quests', schema.classQuests),
   table('checkins', schema.checkins),
   table('events', schema.events),
+  table('routines', schema.routines),
 ];
 
 const SKIP = new Set(['dirty']);

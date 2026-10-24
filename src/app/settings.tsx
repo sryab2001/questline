@@ -7,6 +7,7 @@ import { Chip } from '@/components/chip';
 import { HourStepper } from '@/components/hour-stepper';
 import { ScreenHeader } from '@/components/screen-header';
 import { SysButton } from '@/components/sys-button';
+import { SoundPanel } from '@/components/sound-panel';
 import { SyncPanel } from '@/components/sync-panel';
 import { TestWorldPanel } from '@/components/test-world-panel';
 import { SysText } from '@/components/sys-text';
@@ -134,6 +135,8 @@ export default function SettingsScreen() {
 
         <TestWorldPanel />
         {world === 'real' ? <SyncPanel /> : null}
+
+        <SoundPanel />
 
         <SystemWindow title="NOTIFICATIONS">
           <SysText>

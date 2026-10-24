@@ -6,7 +6,7 @@ import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { acknowledgeDays, setSurvival } from '@/db/actions';
 import { type DaySummary, nextResetAt, startSurvival, SURVIVAL_HOURS } from '@/engine';
 import { usePlayerState } from '@/hooks/use-player-state';
-import { playSound } from '@/sound';
+import { playEvent } from '@/sound';
 import { colors, fonts } from '@/theme';
 
 import { SysButton } from './sys-button';
@@ -22,7 +22,7 @@ export function PenaltyModal({ failures }: { failures: DaySummary[] }) {
   const player = usePlayerState();
 
   useEffect(() => {
-    playSound('penalty');
+    playEvent('penalty');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
   }, []);
 

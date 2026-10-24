@@ -23,6 +23,7 @@ import {
   type SystemItemId,
 } from '@/engine';
 import { uuidv7 } from '@/lib/uuid';
+import { foregroundMillis, hasUsageAccess } from '@/screen-time';
 
 import { db } from './client';
 import {
@@ -33,6 +34,7 @@ import {
   habits,
   logs,
   purchases,
+  routines,
   settings,
   skillUses,
   statAllocations,
@@ -130,6 +132,7 @@ export function toEngineHabit(h: HabitRow): Habit {
     bundle: h.bundle,
     masteryName: h.masteryName,
     masteryTitle: h.masteryTitle,
+    limit: h.limitSource === 'screen_time',
   };
 }
 
@@ -144,6 +147,8 @@ export interface HabitInput {
   place?: string;
   bundle?: string;
   minTarget?: number | null;
+  /** 'screen_time' makes it a Limit Quest tracked from phone usage. */
+  limitSource?: string;
 }
 
 export async function addHabits(list: HabitInput[]) {
@@ -211,6 +216,8 @@ export function closePendingDays(): Promise<number> {
       const closed = await db.select({ day: dayResults.day }).from(dayResults);
       const pending = daysToClose(engineHabits, new Set(closed.map((r) => r.day)), today);
       if (pending.length === 0) return 0;
+      // Limit Quests are judged on the day's real usage, so read it before freezing the day.
+      await recordScreenTime(pending);
 
       const logRows = await db
         .select({ habitId: logs.habitId, day: logs.day, amount: logs.amount })
@@ -410,6 +417,66 @@ export async function startJobTrial() {
 
 export async function chooseJob(jobId: string) {
   await addEvent('job', jobId);
+}
+
+// ---------- screen time (Limit Quests) ----------
+
+/** Local start of a game day (reset hour on the phone's clock), as epoch ms. */
+function dayStartMs(day: string, resetHour: number) {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d, resetHour, 0, 0, 0).getTime();
+}
+
+/**
+ * Writes each screen-time Limit Quest's usage for the given days (default: today)
+ * as log entries, so the day's total equals the minutes the phone measured. A day
+ * always gets an entry, even at 0 minutes, so the engine knows it was measured.
+ * Does nothing without the native module or Usage access.
+ */
+export async function recordScreenTime(days?: string[]) {
+  if (!hasUsageAccess()) return;
+  const limitHabits = (await db.select().from(habits).where(and(isNull(habits.deletedAt), eq(habits.limitSource, 'screen_time')))).filter(
+    (h) => !h.archived,
+  );
+  if (limitHabits.length === 0) return;
+  const s = await getSettings();
+  const today = dayKey(new Date(), s.timeZone, s.resetHour);
+  for (const day of days ?? [today]) {
+    const start = dayStartMs(day, s.resetHour);
+    const ms = await foregroundMillis(start, Math.min(Date.now(), dayStartMs(addDays(day, 1), s.resetHour)));
+    if (ms < 0) return;
+    const minutes = Math.round(ms / 60_000);
+    for (const h of limitHabits) {
+      if (day < h.startDay) continue;
+      const rows = await db
+        .select({ amount: logs.amount })
+        .from(logs)
+        .where(and(eq(logs.habitId, h.id), eq(logs.day, day), isNull(logs.deletedAt)));
+      const current = rows.reduce((sum, r) => sum + r.amount, 0);
+      if (rows.length > 0 && current === minutes) continue;
+      await db.insert(logs).values({ id: uuidv7(), ...stamps(), habitId: h.id, day, amount: minutes - current });
+    }
+  }
+}
+
+// ---------- routines ----------
+
+export async function saveRoutine(id: string | null, name: string, habitIds: string[]) {
+  const values = { name: name.trim(), habitIdsJson: JSON.stringify(habitIds) };
+  if (id) {
+    await db.update(routines).set({ ...values, ...touched() }).where(eq(routines.id, id));
+  } else {
+    const existing = await db.select({ id: routines.id }).from(routines).where(isNull(routines.deletedAt));
+    await db.insert(routines).values({ id: uuidv7(), ...stamps(), ...values, sortOrder: existing.length });
+  }
+}
+
+export async function deleteRoutine(id: string) {
+  await db.update(routines).set({ deletedAt: new Date(), ...touched() }).where(eq(routines.id, id));
+}
+
+export function routinesQuery() {
+  return db.select().from(routines).where(isNull(routines.deletedAt)).orderBy(asc(routines.sortOrder));
 }
 
 // ---------- Main Quests ----------

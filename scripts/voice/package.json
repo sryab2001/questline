@@ -1,0 +1,9 @@
+{
+  "name": "questline-voice-generator",
+  "private": true,
+  "description": "Renders the Voice of the World announcer lines (scripts/voice/generate.mjs). Not part of the app.",
+  "type": "module",
+  "dependencies": {
+    "kokoro-js": "1.2.1"
+  }
+}

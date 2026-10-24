@@ -100,18 +100,26 @@ export function progressFor(logs: LogEntry[], habitId: string, day: DayKey): num
 }
 
 function reachedMin(h: Habit, progress: number): boolean {
-  return !!h.minTarget && h.minTarget > 0 && progress >= h.minTarget && progress < h.target;
+  return !h.limit && !!h.minTarget && h.minTarget > 0 && progress >= h.minTarget && progress < h.target;
 }
+
+/** A normal quest is done at its target; a Limit Quest while it stays at or under it. */
+function isDone(h: Habit, progress: number): boolean {
+  return h.limit ? progress <= h.target : progress >= h.target;
+}
+
+const hasReading = (logs: LogEntry[], habitId: string, day: DayKey) => logs.some((l) => l.habitId === habitId && l.day === day);
 
 /** Freezes a day's result from the habits and logs as they are now. */
 export function evaluateDay(habits: Habit[], logs: LogEntry[], day: DayKey): DayOutcome {
   return {
     day,
     goals: habits
-      .filter((h) => isScheduled(h, day))
+      // A Limit Quest with no reading that day (e.g. Usage access revoked) is left out.
+      .filter((h) => isScheduled(h, day) && (!h.limit || hasReading(logs, h.id, day)))
       .map((h) => {
         const progress = progressFor(logs, h.id, day);
-        const done = progress >= h.target;
+        const done = isDone(h, progress);
         return {
           habitId: h.id,
           name: h.name,
@@ -586,7 +594,7 @@ export function computeState({
     .filter((h) => isScheduled(h, today))
     .map((h) => {
       const progress = progressFor(logs, h.id, today);
-      const done = progress >= h.target;
+      const done = isDone(h, progress);
       const mastered = !!h.mastered;
       return {
         habitId: h.id,
@@ -600,6 +608,7 @@ export function computeState({
         min: !done && reachedMin(h, progress),
         mastered,
         weakened: mastered && (strength.get(h.id) ?? 0) < WEAKENED_BELOW,
+        limit: !!h.limit,
       };
     });
   const clearedToday = goals.filter((g) => g.done).length;
@@ -760,7 +769,8 @@ export function computeState({
   }
   const offers: QuestOffer[] = [];
   for (const h of habits) {
-    if (h.archived || h.mastered) continue;
+    // Upgrades raise targets; for a Limit Quest that would mean "use more", so they get none.
+    if (h.archived || h.mastered || h.limit) continue;
     const recent = entriesByHabit.get(h.id) ?? [];
     const simpleCheck = h.target === 1 && !h.unit;
     const misses7 = recent.slice(0, 7).filter((g) => !g.done && !g.min).length;
@@ -919,20 +929,24 @@ export function computeState({
     let next = 0;
     for (const [d, v] of days) {
       total += v;
-      while (next < RECORD_MILESTONES.length && total >= RECORD_MILESTONES[next].times * h.target) {
+      while (!h.limit && next < RECORD_MILESTONES.length && total >= RECORD_MILESTONES[next].times * h.target) {
         const m = RECORD_MILESTONES[next];
         milestones.push({ habitId: h.id, times: m.times, title: `${h.name} ${m.tier}`, amount: m.times * h.target, reachedDay: d });
         next += 1;
       }
     }
     const sumIn = (lo: DayKey, hi: DayKey) => days.filter(([d]) => d >= lo && d <= hi).reduce((sum, [, v]) => sum + v, 0);
+    const countIn = (lo: DayKey, hi: DayKey) => days.filter(([d]) => d >= lo && d <= hi).length;
     recordHabits.push({
       habitId: h.id,
       name: h.name,
       unit: h.unit,
       target: h.target,
+      limit: !!h.limit,
+      daysLast30: countIn(from30, today),
+      daysPrev30: countIn(from60, addDays(from30, -1)),
       total,
-      daysDone: days.filter(([, v]) => v >= h.target).length,
+      daysDone: days.filter(([, v]) => isDone(h, v)).length,
       bestDay: days.reduce((m, [, v]) => Math.max(m, v), 0),
       last30: sumIn(from30, today),
       prev30: sumIn(from60, addDays(from30, -1)),

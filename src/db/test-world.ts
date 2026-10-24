@@ -31,6 +31,7 @@ import {
   skillUses,
   statAllocations,
   storeItems,
+  routines,
   unlocks,
 } from './schema';
 
@@ -53,7 +54,7 @@ const row = (day: DayKey, hour = 12) => ({ id: uuidv7(), createdAt: at(day, hour
 const monday = (day: DayKey) => addDays(day, -((weekday(day) + 6) % 7));
 
 async function wipe() {
-  for (const t of [settings, habits, logs, dayResults, statAllocations, skillUses, unlocks, classQuests, checkins, events, storeItems, purchases]) {
+  for (const t of [settings, habits, logs, dayResults, statAllocations, skillUses, unlocks, classQuests, checkins, events, storeItems, purchases, routines]) {
     await db.delete(t);
   }
 }
@@ -103,7 +104,29 @@ export async function seedTestWorld() {
   }
   // Today: two quests done, the rest left to try.
   [0, 3].forEach((j) => logRows.push({ ...row(today, 9), habitId: ids[j], day: today, amount: HABITS[j].target }));
+  // A screen-time Limit Quest with a reading every day (always under its 3-hour limit).
+  const phoneId = uuidv7();
+  await db.insert(habits).values({
+    ...row(start, 8),
+    id: phoneId,
+    name: 'Phone under 3 h',
+    stat: 'SENSE',
+    target: 180,
+    unit: 'min',
+    grade: 'C',
+    schedule: 'daily',
+    sortOrder: HABITS.length,
+    startDay: start,
+    limitSource: 'screen_time',
+  });
+  for (let i = 0; i <= DAYS; i++) {
+    const d = i === DAYS ? today : day(i);
+    logRows.push({ ...row(d, 22), habitId: phoneId, day: d, amount: i === DAYS ? 75 : 100 + ((i * 37) % 70) });
+  }
   for (let k = 0; k < logRows.length; k += 200) await db.insert(logs).values(logRows.slice(k, k + 200));
+
+  // A morning routine: Meditate → Push-ups → Read.
+  await db.insert(routines).values({ ...row(start, 8), name: 'Morning routine', habitIdsJson: JSON.stringify([ids[3], ids[0], ids[2]]), sortOrder: 0 });
 
   // Weekly automaticity check-ins: high for Read (mastered) and Meditate (close to a Mastery Trial).
   const checkinRows: (typeof checkins.$inferInsert)[] = [];

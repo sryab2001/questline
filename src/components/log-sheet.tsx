@@ -1,8 +1,10 @@
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { logProgress } from '@/db/actions';
+import { logProgress, recordScreenTime } from '@/db/actions';
+import { isTimeUnit } from '@/dungeon';
 import type { GoalProgress } from '@/engine';
 import { playSound } from '@/sound';
 import { colors, fonts } from '@/theme';
@@ -58,6 +60,35 @@ export function LogSheet({ goal, onClose }: Props) {
   const remaining = Math.max(0, goal.target - goal.progress);
   const unit = goal.unit ? ` ${goal.unit}` : '';
 
+  if (goal.limit) {
+    const over = goal.progress > goal.target;
+    return (
+      <Modal transparent animationType="fade" visible onRequestClose={onClose} statusBarTranslucent>
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close">
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <SystemWindow title="LIMIT QUEST" variant={over ? 'danger' : 'epic'}>
+              <SysText variant="title" style={{ textAlign: 'center' }}>
+                {goal.name}
+              </SysText>
+              <SysText style={{ textAlign: 'center', fontSize: 15, color: over ? colors.dangerSoft : colors.epic }}>
+                {fmt(goal.progress)} of {fmt(goal.target)} min used ·{' '}
+                {over ? `over by ${fmt(goal.progress - goal.target)}` : `${fmt(goal.target - goal.progress)} left`}
+              </SysText>
+              <ProgressBar value={goal.progress / goal.target} color={over ? colors.dangerSoft : colors.epic} />
+              <SysText variant="caption" style={{ textAlign: 'center', lineHeight: 18 }}>
+                Tracked from your screen time, nothing to log. The day is judged when it closes.
+              </SysText>
+              <View style={styles.row}>
+                <SysButton label="REFRESH" variant="ghost" style={{ flex: 1 }} onPress={() => recordScreenTime()} />
+                <SysButton label="CLOSE" variant="ghost" style={{ flex: 1 }} onPress={onClose} />
+              </View>
+            </SystemWindow>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    );
+  }
+
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close">
@@ -96,6 +127,16 @@ export function LogSheet({ goal, onClose }: Props) {
               <SysButton label="ADD" variant="ghost" onPress={submitCustom} style={{ minWidth: 80 }} />
             </View>
 
+            {isTimeUnit(goal.unit) ? (
+              <SysButton
+                label="ENTER DUNGEON"
+                variant="ghost"
+                onPress={() => {
+                  onClose();
+                  router.push({ pathname: '/dungeon', params: { habitId: goal.habitId } });
+                }}
+              />
+            ) : null}
             {remaining > 0 ? (
               <SysButton label={`COMPLETE (+${fmt(remaining)})`} onPress={() => add(remaining)} />
             ) : (

@@ -165,6 +165,8 @@ Also shipped in this round: app icon and splash, Awakening onboarding, history c
 
 ### After Phase 6
 - **Quest Board**: 8 ready-made Main Quests (GenAI Engineer, Couch to Half Marathon, Strength Foundations, Learn a Language A1→A2, Read 12 Books, Cook 20 Dishes, 8-Week Meditation, Personal Finance Basics) written as outlines in `src/engine/quest-board.ts`. Accepting one makes an editable copy and can add and link its daily quest. Later: publish your own Main Quests to the server so others on it can accept them (needs a server collection).
+- **Batch A**: screen-time **Limit Quests** (local Expo module `modules/screen-time` reading Android usage stats; kept by staying under a daily limit; days without a reading don't count), **Instance Dungeon** focus timer for time-based quests, **Routines** (ordered chains run one tap per step), the **Voice of the World** announcer (original lines rendered with Kokoro-82M by `scripts/voice/generate.mjs`) plus custom sounds per event, and **EAS Update** (`runtimeVersion: fingerprint`, channels per build profile). Server migration `1761300000_batch_a.js` (habits.limit_source, routines).
+- **Batch B (next, over the air)**: weekly review, patterns in the Record, and a weekly AI report generated on the server (PocketBase cron + Groq, key in the server environment).
 
 ## 6. Deployment
 

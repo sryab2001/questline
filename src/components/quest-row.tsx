@@ -25,6 +25,10 @@ function fmt(n: number) {
 }
 
 function formatProgress(g: GoalProgress) {
+  if (g.limit) {
+    const left = g.target - g.progress;
+    return `[${fmt(g.progress)}/${fmt(g.target)}] min used · ${left >= 0 ? `${fmt(left)} left` : `over by ${fmt(-left)}`}`;
+  }
   if (g.target === 1 && !g.unit) return g.done ? '[Complete]' : '[Incomplete]';
   const shown = Math.min(g.progress, g.target);
   const min = g.minTarget && !g.done ? ` · min ${fmt(g.minTarget)}` : '';
@@ -32,9 +36,11 @@ function formatProgress(g: GoalProgress) {
 }
 
 export function QuestRow({ goal, cue, bundle, strength, isLast, onPress, onLongPress }: Props) {
-  const done = goal.done;
+  // A Limit Quest is "done" all day while under its limit; it isn't crossed off.
+  const done = goal.done && !goal.limit;
+  const over = goal.limit && !goal.done;
   const passive = goal.mastered && !goal.weakened;
-  const border = done ? colors.borderDone : goal.min ? colors.borderDone : isLast ? colors.gold : colors.borderMuted;
+  const border = goal.limit ? (over ? colors.dangerSoft : colors.epic) : done ? colors.borderDone : goal.min ? colors.borderDone : isLast ? colors.gold : colors.borderMuted;
   return (
     <Pressable
       onPress={onPress}
@@ -52,7 +58,14 @@ export function QuestRow({ goal, cue, bundle, strength, isLast, onPress, onLongP
         },
         isLast && !done && { boxShadow: '0 0 12px rgba(255,200,87,0.35)' },
       ]}>
-      <View style={[styles.box, { backgroundColor: done ? colors.cyan : 'transparent' }, goal.min && styles.boxMin]}>
+      <View
+        style={[
+          styles.box,
+          { backgroundColor: done ? colors.cyan : 'transparent' },
+          goal.min && styles.boxMin,
+          goal.limit && { borderColor: over ? colors.dangerSoft : colors.epic },
+        ]}>
+        {goal.limit ? <MaterialCommunityIcons name={over ? 'close-thick' : 'timer-sand'} size={14} color={over ? colors.dangerSoft : colors.epic} /> : null}
         {done ? <MaterialCommunityIcons name="check-bold" size={14} color={colors.bg} /> : null}
         {goal.min ? <MaterialCommunityIcons name="minus" size={14} color={colors.cyan} /> : null}
       </View>
@@ -84,10 +97,11 @@ export function QuestRow({ goal, cue, bundle, strength, isLast, onPress, onLongP
         <View style={styles.stat}>
           <SysText style={styles.statText}>+{goal.stat}</SysText>
         </View>
+        {goal.limit ? <Badge label={over ? 'OVER LIMIT' : 'LIMIT'} color={over ? colors.dangerSoft : colors.epic} /> : null}
         {goal.min ? <Badge label="MIN" color={colors.cyan} /> : null}
         {passive ? <Badge label="PASSIVE" color={colors.epic} /> : null}
         {goal.weakened ? <Badge label="WEAKENED" color={colors.dangerSoft} /> : null}
-        {isLast && !done && !goal.min ? <Badge label="LAST GOAL" color={colors.gold} /> : null}
+        {isLast && !done && !goal.min && !goal.limit ? <Badge label="LAST GOAL" color={colors.gold} /> : null}
       </View>
     </Pressable>
   );

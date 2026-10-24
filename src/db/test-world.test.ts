@@ -13,6 +13,8 @@ import { computeState, parseMainQuest, type PlayerState } from '@/engine';
 import * as schema from './schema';
 
 vi.mock('expo-crypto', () => ({ getRandomBytes: (n: number) => new Uint8Array(randomBytes(n)) }));
+// The native screen-time module isn't built in Node; the seed doesn't use it.
+vi.mock('../../modules/screen-time', () => ({ default: null }));
 
 vi.mock('./client', () => {
   const sqlite = new DatabaseSync(':memory:');
@@ -132,6 +134,12 @@ describe('Test World seed', () => {
     expect(state.inventory.map((i) => i.id)).toContain(state.mainQuests[0].chapters[0].reward!.id);
     expect(state.shadows.map((s) => s.habitName)).toEqual(['Read']);
     expect(state.record.milestones.length).toBeGreaterThan(0);
+  });
+
+  it('has a screen-time Limit Quest with history', () => {
+    const phone = state.today.goals.find((g) => g.limit)!;
+    expect(phone).toMatchObject({ name: 'Phone under 3 h', progress: 75, done: true });
+    expect(state.record.habits.find((h) => h.limit)).toMatchObject({ daysLast30: 30 });
   });
 
   it('keeps gold at days-of-effort scale', () => {

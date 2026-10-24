@@ -17,6 +17,8 @@ export interface QuickGoal {
   done: boolean;
   /** At the Minimum Clear but not the full target. */
   min: boolean;
+  /** Screen-time Limit Quest: progress is usage, done means under the limit, never tapped. */
+  limit: boolean;
 }
 
 /** What the app last knew beyond today's goals (level, streak), for the widget header. */
@@ -56,7 +58,7 @@ export async function loadTodayGoals(): Promise<{ today: DayKey; goals: QuickGoa
     .where(and(eq(logs.day, today), isNull(logs.deletedAt)));
   const goals = todays.map((h) => {
     const progress = progressFor(logRows, h.id, today);
-    const done = progress >= h.target;
+    const done = h.limit ? progress <= h.target : progress >= h.target;
     return {
       habitId: h.id,
       name: h.name,
@@ -64,7 +66,8 @@ export async function loadTodayGoals(): Promise<{ today: DayKey; goals: QuickGoa
       progress,
       target: h.target,
       done,
-      min: !done && !!h.minTarget && progress >= h.minTarget,
+      min: !h.limit && !done && !!h.minTarget && progress >= h.minTarget,
+      limit: !!h.limit,
     };
   });
   return { today, goals };
@@ -77,9 +80,9 @@ export async function loadTodayGoals(): Promise<{ today: DayKey; goals: QuickGoa
 export async function markGoalDone(habitId: string): Promise<{ name: string; left: number } | null> {
   const { goals } = await loadTodayGoals();
   const goal = goals.find((g) => g.habitId === habitId);
-  if (!goal) return null;
+  if (!goal || goal.limit) return null;
   if (!goal.done) await logProgress(habitId, goal.target - goal.progress);
-  const left = goals.filter((g) => g.habitId !== habitId && !g.done && !g.min).length;
+  const left = goals.filter((g) => g.habitId !== habitId && !g.limit && !g.done && !g.min).length;
   return { name: goal.name, left };
 }
 

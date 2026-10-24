@@ -59,6 +59,8 @@ export const habits = sqliteTable('habits', {
   masteredAt: integer('mastered_at', { mode: 'timestamp_ms' }),
   masteryName: text('mastery_name').notNull().default(''),
   masteryTitle: text('mastery_title').notNull().default(''),
+  /** '' for a normal quest; 'screen_time' for a Limit Quest kept by staying under `target` minutes. */
+  limitSource: text('limit_source').notNull().default(''),
 });
 
 export const logs = sqliteTable(
@@ -152,4 +154,12 @@ export const events = sqliteTable('events', {
   ref: text('ref').notNull(),
   day: text('day').notNull(),
   dataJson: text('data_json'),
+});
+
+/** An ordered chain of quests run one after another ("morning routine"). */
+export const routines = sqliteTable('routines', {
+  ...syncColumns,
+  name: text('name').notNull(),
+  habitIdsJson: text('habit_ids_json').notNull().default('[]'),
+  sortOrder: integer('sort_order').notNull().default(0),
 });

@@ -11,7 +11,7 @@ import { SystemWindow } from '@/components/system-window';
 import { addStoreItem, buy, deleteStoreItem, type RewardKind, updateStoreItem } from '@/db/actions';
 import { DAY_GOLD, describeBoxResult, GATE_GOLD_V2, SHIELD_CAP, SYSTEM_ITEMS, type SystemItemId } from '@/engine';
 import { type StoreItem, usePlayerState } from '@/hooks/use-player-state';
-import { playSound } from '@/sound';
+import { playEvent } from '@/sound';
 import { colors, fonts } from '@/theme';
 
 const g = (n: number) => `${n.toLocaleString()} G`;
@@ -41,7 +41,7 @@ export default function StoreScreen() {
         onPress: async () => {
           try {
             await buy(item);
-            playSound('purchase');
+            playEvent('purchase');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           } catch (e) {
             Alert.alert('Purchase failed', e instanceof Error ? e.message : String(e));

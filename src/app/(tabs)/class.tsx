@@ -14,7 +14,7 @@ import { TASK_ICON } from '@/components/task-icon';
 import { chooseJob, startJobTrial, updateQuestTask } from '@/db/actions';
 import { type QuestTask, taskOpen, taskXp } from '@/engine';
 import { type MainQuestRow, type PlayerData, usePlayerState } from '@/hooks/use-player-state';
-import { playSound } from '@/sound';
+import { playEvent, playSound } from '@/sound';
 import { colors, fonts } from '@/theme';
 
 export default function ClassScreen() {
@@ -117,7 +117,7 @@ function JobChangeWindow({ player }: { player: PlayerData }) {
         text: 'Confirm',
         onPress: async () => {
           await chooseJob(id);
-          playSound('levelup');
+          playEvent('job');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         },
       },
@@ -269,7 +269,8 @@ function MainQuestCard({ quest, player }: { quest: MainQuestRow; player: PlayerD
             setClearing(null);
             await updateQuestTask(quest.id, quest.name, data, ci, ti, 'advance', note);
             const chapterDone = data.chapters[ci].tasks.every((o, j) => j === ti || o.doneDay);
-            playSound(chapterDone ? 'levelup' : 'quest');
+            if (chapterDone) playEvent('boss');
+            else playSound('quest');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           }}
         />

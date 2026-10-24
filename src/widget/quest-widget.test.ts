@@ -8,7 +8,7 @@ vi.mock('react-native-android-widget', async () => {
   return { FlexWidget: flex.FlexWidget, TextWidget: text.TextWidget };
 });
 
-const goal = (over: object) => ({ habitId: 'h', name: 'Push-ups', unit: 'reps', progress: 60, target: 100, done: false, min: false, ...over });
+const goal = (over: object) => ({ habitId: 'h', name: 'Push-ups', unit: 'reps', progress: 60, target: 100, done: false, min: false, limit: false, ...over });
 
 describe('Daily Quest widget', () => {
   it('builds a widget tree for open, minimum and cleared quests', async () => {
@@ -18,13 +18,15 @@ describe('Daily Quest widget', () => {
       goal({ habitId: 'a' }),
       goal({ habitId: 'b', name: 'Read', min: true, progress: 5, target: 20, unit: 'pages' }),
       goal({ habitId: 'c', name: 'Sleep before 23:00', unit: '', target: 1, progress: 1, done: true }),
+      goal({ habitId: 'd', name: 'Phone under 3 h', unit: 'min', target: 180, progress: 42, done: true, limit: true }),
     ];
-    const tree = buildWidgetTree(QuestWidget({ goals, snapshot: { day: '2026-10-21', level: 15, streak: 37, test: false }, height: 180 }));
+    const tree = buildWidgetTree(QuestWidget({ goals, snapshot: { day: '2026-10-21', level: 15, streak: 37, test: false }, height: 240 }));
     const texts = JSON.stringify(tree);
     expect(tree.type).toBe('LinearLayoutWidget');
     expect(texts).toContain('DAILY QUEST');
     expect(texts).toContain('60/100 reps');
     expect(texts).toContain('MARK_DONE');
+    expect(texts).toContain('42/180 min');
   });
 
   it('builds when there are no quests and when rows overflow', async () => {
