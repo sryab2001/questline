@@ -5,7 +5,11 @@ import { colors, fonts } from '@/theme';
 type Variant = 'display' | 'title' | 'label' | 'body' | 'caption' | 'number';
 
 export function SysText({ variant = 'body', style, ...rest }: TextProps & { variant?: Variant }) {
-  return <Text style={[styles.base, styles[variant], style]} {...rest} />;
+  // The body variant has a 21pt line height; a bigger font set in `style` without its
+  // own lineHeight would be clipped (top and bottom cut off), so scale it to fit.
+  const own = StyleSheet.flatten(style);
+  const fit = own?.fontSize && own.lineHeight === undefined && variant === 'body' ? { lineHeight: Math.round(own.fontSize * 1.4) } : null;
+  return <Text style={[styles.base, styles[variant], style, fit]} {...rest} />;
 }
 
 const styles = StyleSheet.create({

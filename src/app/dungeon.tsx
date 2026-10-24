@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: 20, gap: 16 },
   name: { fontFamily: fonts.display, fontSize: 22, textAlign: 'center', color: colors.text },
-  timer: { fontFamily: fonts.display, fontSize: 72, textAlign: 'center', color: colors.epic, fontVariant: ['tabular-nums'], letterSpacing: 2 },
-  big: { fontFamily: fonts.display, fontSize: 40, textAlign: 'center', color: colors.gold },
+  timer: { fontFamily: fonts.display, fontSize: 72, lineHeight: 86, textAlign: 'center', color: colors.epic, fontVariant: ['tabular-nums'], letterSpacing: 2 },
+  big: { fontFamily: fonts.display, fontSize: 40, lineHeight: 50, textAlign: 'center', color: colors.gold },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
 });
