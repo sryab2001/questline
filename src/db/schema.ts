@@ -35,6 +35,8 @@ export const settings = sqliteTable('settings', {
   urgentFrequency: text('urgent_frequency', { enum: ['off', 'rare', 'sometimes', 'often'] })
     .notNull()
     .default('sometimes'),
+  /** Opted in to the server's Sunday AI report. */
+  aiReport: integer('ai_report', { mode: 'boolean' }).notNull().default(false),
 });
 
 export const habits = sqliteTable('habits', {

@@ -43,6 +43,13 @@
       "when": 1792845007812,
       "tag": "0005_batch_a",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792847839611,
+      "tag": "0006_ai_report",
+      "breakpoints": true
     }
   ]
 }

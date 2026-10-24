@@ -1,12 +1,14 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProgressBar } from '@/components/progress-bar';
 import { ScreenHeader } from '@/components/screen-header';
+import { SysButton } from '@/components/sys-button';
 import { SysText } from '@/components/sys-text';
 import { SystemWindow } from '@/components/system-window';
-import { RECORD_MILESTONES } from '@/engine';
+import { type DaySummary, findPatterns, RECORD_MILESTONES, WEEKDAY_NAMES } from '@/engine';
 import { usePlayerState } from '@/hooks/use-player-state';
 import { colors, fonts } from '@/theme';
 
@@ -24,6 +26,10 @@ export default function RecordScreen() {
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenHeader title="HUNTER'S RECORD" />
+
+        <SysButton label="WEEKLY REVIEW" variant="ghost" onPress={() => router.push('/review')} />
+
+        <PatternsWindow history={player.state.history} today={player.today} />
 
         <SystemWindow title="SYSTEM REPORT">
           <SysText variant="caption" style={{ textAlign: 'center' }}>
@@ -104,6 +110,46 @@ export default function RecordScreen() {
   );
 }
 
+function PatternsWindow({ history, today }: { history: DaySummary[]; today: string }) {
+  const p = findPatterns(history, today);
+  const max = Math.max(1, ...p.weekdayDays);
+  // Monday first, like the Gate.
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  if (p.weekdayDays.every((d) => d === 0)) return null;
+  return (
+    <SystemWindow title="PATTERNS" variant="epic">
+      <SysText variant="caption" style={{ textAlign: 'center' }}>
+        Misses by weekday, last 8 weeks
+      </SysText>
+      <View style={styles.bars}>
+        {order.map((d) => {
+          const rate = p.weekdayDays[d] ? p.weekdayMissed[d] / p.weekdayDays[d] : 0;
+          return (
+            <View key={d} style={styles.barCol} accessibilityLabel={`${WEEKDAY_NAMES[d]}: ${p.weekdayMissed[d]} misses in ${p.weekdayDays[d]} days`}>
+              <View style={styles.barTrack}>
+                <View
+                  style={[
+                    styles.barFill,
+                    { height: `${Math.max(4, rate * 100)}%`, backgroundColor: d === p.weakestDay ? colors.dangerSoft : colors.epic, opacity: p.weekdayDays[d] / max },
+                  ]}
+                />
+              </View>
+              <SysText variant="caption" style={{ fontSize: 11 }}>
+                {WEEKDAY_NAMES[d].slice(0, 2)}
+              </SysText>
+            </View>
+          );
+        })}
+      </View>
+      {p.suggestions.map((s) => (
+        <SysText key={s} style={{ fontSize: 13, lineHeight: 19, color: colors.textSoft }}>
+          · {s}
+        </SysText>
+      ))}
+    </SystemWindow>
+  );
+}
+
 function Stat({ label, value, sub, color = colors.text }: { label: string; value: string; sub?: string; color?: string }) {
   return (
     <View style={{ width: '50%', alignItems: 'center', paddingVertical: 8 }}>
@@ -124,4 +170,8 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 },
   value: { fontSize: 13, color: colors.text, fontVariant: ['tabular-nums'] },
   milestone: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 40 },
+  bars: { flexDirection: 'row', justifyContent: 'space-between', gap: 6, height: 90 },
+  barCol: { flex: 1, alignItems: 'center', gap: 4 },
+  barTrack: { flex: 1, width: '100%', backgroundColor: colors.track, justifyContent: 'flex-end' },
+  barFill: { width: '100%' },
 });

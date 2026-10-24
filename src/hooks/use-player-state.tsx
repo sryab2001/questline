@@ -8,6 +8,7 @@ import {
   classQuestsQuery,
   closePendingDays,
   recordScreenTime,
+  type ReviewData,
   routinesQuery,
   dayResultsQuery,
   eventsQuery,
@@ -107,6 +108,7 @@ export interface PlayerData {
     surprisesOn: boolean;
     title: string;
     urgentFrequency: UrgentFrequency;
+    aiReport: boolean;
   };
   today: string;
   now: Date;
@@ -126,6 +128,8 @@ export interface PlayerData {
   urgentSchedule: { at: number; text: string; day: string; challengeId: string }[];
   mainQuests: MainQuestRow[];
   routines: RoutineRow[];
+  /** Weekly reviews by week start, latest save wins. */
+  reviews: { week: string; data: ReviewData }[];
 }
 
 export interface RoutineRow {
@@ -267,6 +271,7 @@ function useComputePlayer(): PlayerData | null {
         surprisesOn: s.surprisesOn,
         title: s.title,
         urgentFrequency,
+        aiReport: s.aiReport,
       },
       today,
       now,
@@ -280,6 +285,9 @@ function useComputePlayer(): PlayerData | null {
       urgentSchedule,
       mainQuests,
       routines,
+      reviews: [...new Map(ordered.filter((e) => e.kind === 'review').map((e) => [e.ref, data(e) as ReviewData])).entries()]
+        .map(([week, d]) => ({ week, data: d }))
+        .sort((a, b) => (a.week < b.week ? -1 : 1)),
     };
   }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows, routineRows, now]);
 

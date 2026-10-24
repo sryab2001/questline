@@ -48,10 +48,10 @@ export class PbClient {
     this.token = token;
   }
 
-  private async request<T>(method: string, path: string, body?: unknown, query?: Record<string, string>): Promise<T> {
+  private async request<T>(method: string, path: string, body?: unknown, query?: Record<string, string>, timeoutMs = TIMEOUT_MS): Promise<T> {
     const qs = query ? `?${new URLSearchParams(query).toString()}` : '';
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}${qs}`, {
@@ -101,6 +101,11 @@ export class PbClient {
 
   update(collection: string, id: string, body: Record<string, unknown>) {
     return this.request<PbRecord>('PATCH', `/api/collections/${collection}/records/${encodeURIComponent(id)}`, body);
+  }
+
+  /** A custom server endpoint (e.g. the weekly report), with a longer timeout. */
+  call<T>(method: string, path: string, body?: unknown, timeoutMs = 90_000) {
+    return this.request<T>(method, path, body, undefined, timeoutMs);
   }
 
   health() {

@@ -24,10 +24,11 @@ RUN set -eux; \
     chown -R questline:questline /pb
 
 COPY --chown=questline:questline pb_migrations /pb/pb_migrations
+COPY --chown=questline:questline pb_hooks /pb/pb_hooks
 
 USER questline
 WORKDIR /pb
 # Internal only: not published on the host. Caddy reaches it over the Docker network.
 EXPOSE 9090
 ENV GOMEMLIMIT=96MiB
-CMD ["/pb/pocketbase", "serve", "--http=0.0.0.0:9090", "--dir=/pb/pb_data", "--migrationsDir=/pb/pb_migrations", "--hooksPool=2"]
+CMD ["/pb/pocketbase", "serve", "--http=0.0.0.0:9090", "--dir=/pb/pb_data", "--migrationsDir=/pb/pb_migrations", "--hooksDir=/pb/pb_hooks", "--hooksPool=2"]

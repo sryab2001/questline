@@ -12,6 +12,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DATA_DIR="/opt/questline/pb_data"
+ENV_FILE="/opt/questline/questline.env"
 PB_UID=10001
 PORT=9090
 
@@ -108,13 +109,32 @@ fi
 [[ $EUID -eq 0 ]] || die "run with sudo (needed to create $DATA_DIR)."
 
 [[ -d "$HERE/../pb_migrations" ]] || die "pb_migrations folder missing next to docker/. Unpack the full questline-server package."
+[[ -d "$HERE/../pb_hooks" ]] || die "pb_hooks folder missing next to docker/. Unpack the full questline-server package."
 
 mkdir -p "$DATA_DIR"
 chown -R "$PB_UID:$PB_UID" "$DATA_DIR"
 
+# Private settings (AI key) live next to the data, readable by root only, and are
+# never overwritten by an upgrade.
+if [[ ! -f "$ENV_FILE" ]]; then
+  cat >"$ENV_FILE" <<'EOF_ENV'
+# Questline server settings. After editing, apply with:
+#   cd ~/questline-server/docker && sudo docker compose up -d
+#
+# Weekly AI report (https://console.groq.com/keys). Leave empty to turn it off.
+GROQ_API_KEY=
+# GROQ_MODEL=llama-3.3-70b-versatile
+# Cron for the Sunday report, in UTC (default: Sundays 13:30 UTC).
+# QUESTLINE_REPORT_CRON=30 13 * * 0
+EOF_ENV
+  chmod 600 "$ENV_FILE"
+  echo "==> Created $ENV_FILE (add GROQ_API_KEY there to turn on the weekly AI report)"
+fi
+
 cat >"$HERE/.env" <<EOF
 CADDY_NETWORK=$NETWORK
 QUESTLINE_DATA=$DATA_DIR
+QUESTLINE_ENV_FILE=$ENV_FILE
 EOF
 
 echo

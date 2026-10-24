@@ -10,6 +10,7 @@ import {
   type DayKey,
   gateItem,
   type Grade,
+  reviewWeek,
   type MainQuestData,
   type QuestTask,
   type TaskType,
@@ -145,6 +146,13 @@ export async function seedTestWorld() {
     { ...row(day(55), 21), kind: 'offer', ref: ids[2], day: day(55), dataJson: JSON.stringify({ kind: 'mastery', accepted: true }) },
     { ...row(addDays(gateWeek, 7), 9), kind: 'equip', ref: gateReward.slot, day: addDays(gateWeek, 7), dataJson: JSON.stringify({ itemId: gateReward.id }) },
     { ...row(addDays(today, -4), 9), kind: 'job_trial', ref: 'start', day: addDays(today, -4), dataJson: null },
+    {
+      ...row(addDays(today, -7), 20),
+      kind: 'review',
+      ref: reviewWeek(addDays(today, -7)),
+      day: addDays(today, -7),
+      dataJson: JSON.stringify({ worked: 'Push-ups right after brushing.', blocked: 'Late nights.', focus: 'Meditate', planned: [] }),
+    },
   ]);
 
   // Main Quests: a multi-chapter learning path (first chapter cleared, its bounty

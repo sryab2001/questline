@@ -67,6 +67,14 @@ const SECTIONS: { title: string; body: string[] }[] = [
     ],
   },
   {
+    title: 'WEEKLY REVIEW',
+    body: [
+      'On Sundays and Mondays the System asks for a five-minute review: the week in numbers, quick fixes for quests that slipped (lower the target, add a minimum), what worked, what got in the way, and next week’s focus and Main Quest goals. Planning ahead like this is one of the better-evidenced habit techniques.',
+      'The Record shows patterns from your history: your weakest weekday, quests that keep ending on the minimum, and quests that have become automatic.',
+      'If your server has an AI key, the System can also write the week’s report from your numbers and quest names (never your notes). Turn on the Sunday report in Settings → Sync.',
+    ],
+  },
+  {
     title: 'FROM THE HOME SCREEN',
     body: [
       'Add the Daily Quest widget (long-press your home screen → Widgets → Questline). Tap a circle to clear a quest without opening the app; tap anywhere else to open it.',

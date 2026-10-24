@@ -8,6 +8,10 @@ services:
     image: questline-server:local
     container_name: questline
     restart: unless-stopped
+    # Private settings such as GROQ_API_KEY for the weekly AI report; setup.sh
+    # creates the file (root-only) and upgrades never overwrite it.
+    env_file:
+      - ${QUESTLINE_ENV_FILE:-/opt/questline/questline.env}
     volumes:
       # Data lives outside the package folder, so upgrades never touch it.
       - ${QUESTLINE_DATA:-/opt/questline/pb_data}:/pb/pb_data

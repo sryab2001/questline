@@ -98,6 +98,7 @@ export type SettingsPatch = Partial<
     | 'surprisesOn'
     | 'title'
     | 'urgentFrequency'
+    | 'aiReport'
   >
 >;
 
@@ -355,6 +356,21 @@ async function addEvent(kind: string, ref: string, data?: unknown) {
     day: await todayKey(),
     dataJson: data === undefined ? null : JSON.stringify(data),
   });
+}
+
+/** What a weekly review records: reflections, next week's focus and Main Quest goals. */
+export interface ReviewData {
+  worked: string;
+  blocked: string;
+  /** Quest name to focus on next week. */
+  focus: string | null;
+  /** Main Quest quests aimed for next week. */
+  planned: { questId: string; title: string }[];
+}
+
+/** Saves the review of the week starting `weekStart` (a later save replaces it). */
+export function saveReview(weekStart: string, data: ReviewData) {
+  return addEvent('review', weekStart, data);
 }
 
 /** Marks a one-time notice (season recap, daily report, re-plan) as seen. */

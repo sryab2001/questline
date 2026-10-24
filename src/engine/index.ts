@@ -12,3 +12,4 @@ export * from './achievements';
 export * from './items';
 export * from './main-quests';
 export * from './quest-board';
+export * from './review';

@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Switch, TextInput, View } from 'react-native';
+
+import { updateSettings } from '@/db/actions';
+import { usePlayerState } from '@/hooks/use-player-state';
 
 import { NetworkError, PbError } from '@/sync/client';
 import { signIn, signOut, syncNow } from '@/sync/engine';
@@ -22,6 +25,7 @@ const STATE_TEXT = { idle: 'Synced', syncing: 'Syncing…', offline: 'Offline', 
 
 export function SyncPanel() {
   const status = useSyncStatus();
+  const player = usePlayerState();
   const [url, setUrl] = useState(status.serverUrl ?? '');
   const [email, setEmail] = useState(status.email ?? '');
   const [password, setPassword] = useState('');
@@ -68,6 +72,24 @@ export function SyncPanel() {
         <SysText variant="caption" style={{ fontSize: 11 }}>
           Syncs when the app opens and every 5 minutes while it&apos;s open. Use Sync Now for anything urgent.
         </SysText>
+        {player ? (
+          <View style={styles.aiRow}>
+            <View style={{ flex: 1 }}>
+              <SysText style={{ fontSize: 14, color: colors.text }}>Weekly AI report</SysText>
+              <SysText variant="caption" style={{ fontSize: 11, lineHeight: 16 }}>
+                Sundays, your server sends the week&apos;s numbers and quest names (never notes) to the AI service it&apos;s set up with,
+                and the report appears in the weekly review.
+              </SysText>
+            </View>
+            <Switch
+              value={player.settings.aiReport}
+              onValueChange={(v) => updateSettings({ aiReport: v })}
+              trackColor={{ true: colors.borderDone, false: colors.borderMuted }}
+              thumbColor={player.settings.aiReport ? colors.gold : colors.textMuted}
+              accessibilityLabel="Weekly AI report"
+            />
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <SysButton label="SYNC NOW" style={{ flex: 1 }} disabled={status.state === 'syncing'} onPress={() => syncNow()} />
           <SysButton label="SIGN OUT" variant="ghost" style={{ flex: 1 }} onPress={confirmSignOut} />
@@ -152,6 +174,7 @@ function Row({ label, value, valueColor }: { label: string; value: string; value
 }
 
 const styles = StyleSheet.create({
+  aiRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderTopColor: colors.borderMuted, paddingTop: 10 },
   input: {
     minHeight: 48,
     borderWidth: 1,

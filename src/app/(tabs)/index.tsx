@@ -25,7 +25,7 @@ import {
 import { SystemWindow } from '@/components/system-window';
 import { addHabits, logProgress, SAMPLE_HABITS } from '@/db/actions';
 import { readDungeon } from '@/dungeon';
-import { addDays, COMEBACK_BONUS, DAY_GOLD, GOLD_DAILY_CLEAR, type GoalProgress, nextResetAt, POINTS_PER_DAILY_CLEAR } from '@/engine';
+import { addDays, COMEBACK_BONUS, DAY_GOLD, reviewDue, reviewWeek, GOLD_DAILY_CLEAR, type GoalProgress, nextResetAt, POINTS_PER_DAILY_CLEAR } from '@/engine';
 import { useClearEvents } from '@/hooks/use-clear-events';
 import { usePlayerState } from '@/hooks/use-player-state';
 import { colors, fonts } from '@/theme';
@@ -48,6 +48,7 @@ export default function QuestsScreen() {
   const { state, settings, now, activeSurvival } = player;
   const unlocked = player.storeItems.filter((i) => i.kind === 'unlock').map((i) => i.name);
   const dungeon = readDungeon();
+  const reviewPending = player.habits.length > 0 && reviewDue(player.today) && !player.reviews.some((r) => r.week === reviewWeek(player.today));
   const openGoal = state.today.goals.find((g) => g.habitId === openId) ?? null;
 
   const onPressGoal = async (g: GoalProgress) => {
@@ -235,6 +236,15 @@ export default function QuestsScreen() {
         </SystemWindow>
 
         {player.habits.length > 0 ? <GateCard gate={state.gate} /> : null}
+
+        {reviewPending ? (
+          <SystemWindow title="WEEKLY REVIEW" variant="gold" pulse>
+            <SysText style={{ textAlign: 'center', fontSize: 14, lineHeight: 20, color: colors.text }}>
+              The week is over. Five minutes: what worked, what to change, what to aim for.
+            </SysText>
+            <SysButton label="REVIEW THE WEEK" variant="gold" onPress={() => router.push('/review')} />
+          </SystemWindow>
+        ) : null}
 
         {player.routines.length > 0 ? (
           <SystemWindow title="ROUTINES">

@@ -111,7 +111,7 @@ Wants=network-online.target
 User=$SERVICE
 Group=$SERVICE
 WorkingDirectory=$APP_DIR
-ExecStart=$APP_DIR/pocketbase serve $LISTEN --dir $APP_DIR/pb_data --migrationsDir $APP_DIR/pb_migrations --hooksPool 2
+ExecStart=$APP_DIR/pocketbase serve $LISTEN --dir $APP_DIR/pb_data --migrationsDir $APP_DIR/pb_migrations --hooksDir $APP_DIR/pb_hooks --hooksPool 2
 Restart=on-failure
 RestartSec=5
 
@@ -168,7 +168,7 @@ fi
 if ! id "$SERVICE" >/dev/null 2>&1; then
   useradd --system --home-dir "$APP_DIR" --shell /usr/sbin/nologin "$SERVICE"
 fi
-mkdir -p "$APP_DIR/pb_data" "$APP_DIR/pb_migrations"
+mkdir -p "$APP_DIR/pb_data" "$APP_DIR/pb_migrations" "$APP_DIR/pb_hooks"
 
 # --- binary (checksum-verified) ---
 ZIP="pocketbase_${PB_VERSION}_linux_${ARCH}.zip"
@@ -184,6 +184,8 @@ install -m 0755 "$TMP/pocketbase" "$APP_DIR/pocketbase"
 # --- schema ---
 rm -f "$APP_DIR"/pb_migrations/*.js
 cp "$HERE"/pb_migrations/*.js "$APP_DIR/pb_migrations/"
+rm -f "$APP_DIR"/pb_hooks/*.js
+cp "$HERE"/pb_hooks/*.js "$APP_DIR/pb_hooks/"
 chown -R "$SERVICE:$SERVICE" "$APP_DIR"
 
 # --- systemd service ---
