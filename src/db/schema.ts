@@ -37,6 +37,8 @@ export const settings = sqliteTable('settings', {
     .default('sometimes'),
   /** Opted in to the server's Sunday AI report. */
   aiReport: integer('ai_report', { mode: 'boolean' }).notNull().default(false),
+  /** The AI report may read the player's own writing (journal text, review reflections). */
+  aiReadsWriting: integer('ai_reads_writing', { mode: 'boolean' }).notNull().default(false),
 });
 
 export const habits = sqliteTable('habits', {
@@ -165,3 +167,16 @@ export const routines = sqliteTable('routines', {
   habitIdsJson: text('habit_ids_json').notNull().default('[]'),
   sortOrder: integer('sort_order').notNull().default(0),
 });
+
+/** Journal: one optional entry per day, with mood and energy ratings (1–5, 0 = not rated). */
+export const journal = sqliteTable(
+  'journal',
+  {
+    ...syncColumns,
+    day: text('day').notNull(),
+    mood: integer('mood').notNull().default(0),
+    energy: integer('energy').notNull().default(0),
+    text: text('text').notNull().default(''),
+  },
+  (t) => [index('journal_day_idx').on(t.day)],
+);

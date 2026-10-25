@@ -60,6 +60,7 @@ export default function StatusScreen() {
         <View style={styles.topBar}>
           <SysText variant="caption">{state.streak}-day streak</SysText>
           <View style={{ flexDirection: 'row' }}>
+            <IconButton icon="notebook-outline" label="Journal" onPress={() => router.push('/journal')} />
             <IconButton icon="book-open-page-variant-outline" label="Hunter's Record" onPress={() => router.push('/record')} />
             <IconButton icon="trophy-outline" label="Achievements" onPress={() => router.push('/achievements')} />
             <IconButton icon="calendar-month-outline" label="History" onPress={() => router.push('/history')} />
@@ -175,7 +176,7 @@ export default function StatusScreen() {
   );
 }
 
-function IconButton({ icon, label, onPress }: { icon: 'cog-outline' | 'calendar-month-outline' | 'trophy-outline' | 'book-open-page-variant-outline'; label: string; onPress: () => void }) {
+function IconButton({ icon, label, onPress }: { icon: 'cog-outline' | 'calendar-month-outline' | 'trophy-outline' | 'book-open-page-variant-outline' | 'notebook-outline'; label: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={6} style={styles.iconBtn}>
       <MaterialCommunityIcons name={icon} size={22} color={colors.textMuted} />

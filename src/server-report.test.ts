@@ -51,11 +51,18 @@ g.$app = {
     if (filter.includes('ai_report = true')) rows = rows.filter((r) => r.data.ai_report === true);
     if (params.d) rows = rows.filter((r) => String(r.data.day) >= String(params.d));
     if (params.t) rows = rows.filter((r) => r.data.through === params.t);
+    if (params.r) rows = rows.filter((r) => r.data.ref === params.r && r.data.kind === 'report_input');
+    if (params.p) rows = rows.filter((r) => r.data.period === params.p);
     if (sort === '-day') rows = [...rows].sort((a, b) => (String(a.data.day) < String(b.data.day) ? 1 : -1));
     if (sort === '-created') rows = [...rows].sort((a, b) => (String(a.data.created) < String(b.data.created) ? 1 : -1));
     return rows.slice(0, limit);
   },
   findCollectionByNameOrId: (name: string) => ({ name }),
+  findRecordById: (c: string, id: string) => {
+    const r = (db[c] ?? []).find((x) => x.data.id === id);
+    if (!r) throw new Error('not found');
+    return { ...r, get: (k: string) => r.data[k] };
+  },
   save: (r: ReturnType<typeof record>) => {
     r.data.created = new Date().toISOString().replace('T', ' ');
     r.data.id = `rep${(db.reports ?? []).length + 1}`;
@@ -99,7 +106,7 @@ beforeEach(() => {
       }),
     ],
     events: [record('events', { owner: 'u1', kind: 'review', data_json: JSON.stringify({ focus: 'Push-ups' }), created: '2026-10-12 10:00:00' })],
-    settings: [record('settings', { owner: 'u1', ai_report: true })],
+    settings: [record('settings', { id: 'settings-u1', owner: 'u1', ai_report: true, ai_reads_writing: false })],
     reports: [],
   };
 });
@@ -168,5 +175,40 @@ describe('server weekly report hook', () => {
     report.generateWeekly();
     expect(db.reports).toHaveLength(1);
     expect(sent).toHaveLength(1);
+  });
+
+  const appInput = (period: 'week' | 'month') => ({
+    period,
+    from: '2026-10-19',
+    to: '2026-10-25',
+    days: { thisPeriod: '5/7 days kept (71%)', change: 'down 15 points from the previous period' },
+    findings: ['[anchor habit] On days you do Run, you also do Study 96% of the time, vs 0% without it.'],
+    playerWriting: { journal: [{ day: '2026-10-21', text: 'Meetings ran late.' }] },
+  });
+  const sentData = () => JSON.parse(JSON.parse(sent.at(-1)!.body).messages[1].content.slice('Data:'.length + 1));
+  const sentPrompt = () => JSON.parse(sent.at(-1)!.body).messages[0].content as string;
+
+  it("uses the app's analysis with the right prompt, and keeps writing private unless allowed", () => {
+    const r = report.generateFor('u1', { period: 'week', input: appInput('week') });
+    expect(r).toMatchObject({ period: 'week', through: '2026-10-25' });
+    expect(sentPrompt()).toMatch(/^You are "the System"[\s\S]*KEEP:/);
+    expect(sentData().findings[0]).toMatch(/anchor habit/);
+    expect(sentData().playerWriting).toBeUndefined();
+
+    db.reports = [];
+    db.settings[0].data.ai_reads_writing = true;
+    report.generateFor('u1', { period: 'month', input: appInput('month') });
+    expect(sentPrompt()).toMatch(/SEASON VERDICT/);
+    expect(sentData().playerWriting.journal[0].text).toBe('Meetings ran late.');
+  });
+
+  it('writes the Season report from the analysis the app saved, and only then', () => {
+    report.generateMonthly();
+    expect(db.reports).toHaveLength(0);
+    db.events.push(record('events', { owner: 'u1', kind: 'report_input', ref: 'month', data_json: JSON.stringify(appInput('month')), created: '2026-11-01 08:00:00' }));
+    report.generateMonthly();
+    report.generateMonthly();
+    expect(db.reports).toHaveLength(1);
+    expect(db.reports[0].data).toMatchObject({ period: 'month', through: '2026-10-25' });
   });
 });

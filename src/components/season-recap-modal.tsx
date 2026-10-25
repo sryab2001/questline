@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 
@@ -60,6 +61,14 @@ export function SeasonRecapModal({ month, days, title }: { month: string; days: 
           </View>
           <SysText style={styles.body}>A new Season begins today. Whatever happened last month, the slate is clean.</SysText>
           <SysButton label="BEGIN NEW SEASON" variant={title ? 'gold' : 'primary'} onPress={dismiss} />
+          <SysButton
+            label="SEASON ANALYSIS"
+            variant="ghost"
+            onPress={async () => {
+              await dismiss();
+              router.push({ pathname: '/analysis', params: { period: 'month' } });
+            }}
+          />
         </SystemWindow>
       </View>
     </Modal>

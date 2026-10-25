@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import {
   addDays,
@@ -32,6 +32,7 @@ import {
   dayResults,
   events,
   habits,
+  journal,
   logs,
   purchases,
   routines,
@@ -99,6 +100,7 @@ export type SettingsPatch = Partial<
     | 'title'
     | 'urgentFrequency'
     | 'aiReport'
+    | 'aiReadsWriting'
   >
 >;
 
@@ -373,6 +375,11 @@ export function saveReview(weekStart: string, data: ReviewData) {
   return addEvent('review', weekStart, data);
 }
 
+/** Keeps the latest analysis for a period on the server, for the scheduled AI reports. */
+export function saveReportInput(period: 'week' | 'month', input: unknown) {
+  return addEvent('report_input', period, input);
+}
+
 /** Marks a one-time notice (season recap, daily report, re-plan) as seen. */
 export function markSeen(ref: string) {
   return addEvent('seen', ref);
@@ -473,6 +480,23 @@ export async function recordScreenTime(days?: string[]) {
       await db.insert(logs).values({ id: uuidv7(), ...stamps(), habitId: h.id, day, amount: minutes - current });
     }
   }
+}
+
+// ---------- journal ----------
+
+/** Saves the journal entry for a day (one per day; ratings 1–5, 0 = not rated). */
+export async function saveJournal(id: string | null, day: string, mood: number, energy: number, text: string) {
+  const values = { day, mood, energy, text: text.trim() };
+  if (id) await db.update(journal).set({ ...values, ...touched() }).where(eq(journal.id, id));
+  else await db.insert(journal).values({ id: uuidv7(), ...stamps(), ...values });
+}
+
+export async function deleteJournal(id: string) {
+  await db.update(journal).set({ deletedAt: new Date(), ...touched() }).where(eq(journal.id, id));
+}
+
+export function journalQuery() {
+  return db.select().from(journal).where(isNull(journal.deletedAt)).orderBy(desc(journal.day));
 }
 
 // ---------- routines ----------

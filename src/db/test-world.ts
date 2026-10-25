@@ -32,6 +32,7 @@ import {
   skillUses,
   statAllocations,
   storeItems,
+  journal,
   routines,
   unlocks,
 } from './schema';
@@ -50,12 +51,25 @@ const HABITS = [
   { name: 'Study GenAI', stat: 'INT', target: 45, unit: 'min', grade: 'C', minTarget: 15, cue: 'lunch' },
 ] as const;
 
+/** Usual hour each habit is logged (Study is varied in the loop). */
+const HABIT_HOURS = [7, 6, 21, 6, 22, 13];
+
+const JOURNAL_LINES = [
+  'Felt sharp after the morning run.',
+  'Long day. Did the minimum and called it.',
+  'Meetings ran late again; study slipped.',
+  'Good focus block at lunch on RAG.',
+  'Too much phone tonight, slept badly.',
+  'Quiet evening, read for an hour.',
+  'Calm start after meditating.',
+];
+
 const at = (day: DayKey, hour = 12) => new Date(`${day}T${String(hour).padStart(2, '0')}:00:00`);
 const row = (day: DayKey, hour = 12) => ({ id: uuidv7(), createdAt: at(day, hour), updatedAt: at(day, hour), dirty: true });
 const monday = (day: DayKey) => addDays(day, -((weekday(day) + 6) % 7));
 
 async function wipe() {
-  for (const t of [settings, habits, logs, dayResults, statAllocations, skillUses, unlocks, classQuests, checkins, events, storeItems, purchases, routines]) {
+  for (const t of [settings, habits, logs, dayResults, statAllocations, skillUses, unlocks, classQuests, checkins, events, storeItems, purchases, routines, journal]) {
     await db.delete(t);
   }
 }
@@ -95,12 +109,27 @@ export async function seedTestWorld() {
 
   // History: mostly full clears, Minimum Clears every 9th day, a slip on day 18,
   // a slip + failure on days 40–41 (streak reset), a lone slip on day 60.
+  // Recent weeks carry patterns for the Hunter Analysis, never on consecutive days:
+  // Tuesdays skip Run and Study together (Run anchors Study), Thursdays skip Study
+  // (weak day), Saturdays break the phone limit and skip Meditate.
   const logRows: (typeof logs.$inferInsert)[] = [];
+  // Last six weeks, but not the last five days (the Job Change trial needs them kept)
+  // and never next to the scripted misses (two misses in a row would be a Failure).
+  const recent = (i: number) => i >= DAYS - 42 && i < DAYS - 5 && !MISSED_ALL.has(i - 1) && !MISSED_ALL.has(i + 1) && !MISSED_ALL.has(i);
+  const skip = (i: number, j: number) => {
+    if (!recent(i)) return false;
+    const wd = weekday(day(i));
+    const oddWeek = Math.floor(i / 7) % 2 === 1;
+    return (wd === 2 && (j === 1 || j === 5)) || (wd === 4 && oddWeek && j === 5) || (wd === 6 && !oddWeek && j === 3);
+  };
   for (let i = 0; i < DAYS; i++) {
     if (MISSED_ALL.has(i)) continue;
     HABITS.forEach((h, j) => {
+      if (skip(i, j)) return;
       const atMin = i % 9 === 4 && h.minTarget !== null && j % 2 === 0;
-      logRows.push({ ...row(day(i), 19), habitId: ids[j], day: day(i), amount: atMin ? h.minTarget! : h.target });
+      // Each habit has its usual hour; Study wanders (no fixed time).
+      const hour = j === 5 ? 12 + ((i * 7) % 11) : HABIT_HOURS[j];
+      logRows.push({ ...row(day(i), hour), habitId: ids[j], day: day(i), amount: atMin ? h.minTarget! : h.target });
     });
   }
   // Today: two quests done, the rest left to try.
@@ -122,9 +151,22 @@ export async function seedTestWorld() {
   });
   for (let i = 0; i <= DAYS; i++) {
     const d = i === DAYS ? today : day(i);
-    logRows.push({ ...row(d, 22), habitId: phoneId, day: d, amount: i === DAYS ? 75 : 100 + ((i * 37) % 70) });
+    const overLimit = i < DAYS && recent(i) && weekday(d) === 6 && Math.floor(i / 7) % 2 === 0;
+    logRows.push({ ...row(d, 22), habitId: phoneId, day: d, amount: i === DAYS ? 75 : overLimit ? 225 : 100 + ((i * 37) % 70) });
   }
   for (let k = 0; k < logRows.length; k += 200) await db.insert(logs).values(logRows.slice(k, k + 200));
+
+  // Journal: most of the last 40 days, mood following Meditate and the phone limit.
+  const journalRows: (typeof journal.$inferInsert)[] = [];
+  for (let i = DAYS - 40; i < DAYS; i++) {
+    if (i % 6 === 5) continue;
+    const meditated = !MISSED_ALL.has(i) && !skip(i, 3);
+    const overPhone = recent(i) && weekday(day(i)) === 6 && Math.floor(i / 7) % 2 === 0;
+    const mood = Math.max(1, Math.min(5, 3 + (meditated ? 1 : -1) + (overPhone ? -1 : 0) + (i % 3 === 0 ? 1 : 0)));
+    const energy = Math.max(1, Math.min(5, 3 + (skip(i, 1) ? -1 : 1) + (i % 4 === 0 ? -1 : 0)));
+    journalRows.push({ ...row(day(i), 22), day: day(i), mood, energy, text: JOURNAL_LINES[i % JOURNAL_LINES.length] });
+  }
+  await db.insert(journal).values(journalRows);
 
   // A morning routine: Meditate → Push-ups → Read.
   await db.insert(routines).values({ ...row(start, 8), name: 'Morning routine', habitIdsJson: JSON.stringify([ids[3], ids[0], ids[2]]), sortOrder: 0 });

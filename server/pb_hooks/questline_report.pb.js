@@ -9,7 +9,7 @@ routerAdd(
   '/api/questline/report',
   (e) => {
     const report = require(`${__hooks}/questline_report.js`);
-    return e.json(200, report.generateFor(e.auth.id));
+    return e.json(200, report.generateFor(e.auth.id, e.requestInfo().body));
   },
   $apis.requireAuth('users'),
 );
@@ -18,4 +18,10 @@ routerAdd(
 cronAdd('questline_weekly_report', $os.getenv('QUESTLINE_REPORT_CRON') || '30 13 * * 0', () => {
   const report = require(`${__hooks}/questline_report.js`);
   report.generateWeekly();
+});
+
+// The 1st of each month, 14:00 UTC: the Season report. Override with QUESTLINE_SEASON_CRON.
+cronAdd('questline_season_report', $os.getenv('QUESTLINE_SEASON_CRON') || '0 14 1 * *', () => {
+  const report = require(`${__hooks}/questline_report.js`);
+  report.generateMonthly();
 });

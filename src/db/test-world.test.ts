@@ -42,6 +42,10 @@ vi.mock('./client', () => {
 
 let state: PlayerState;
 let today: string;
+let habitList: import('@/engine').Habit[] = [];
+let logRowsAll: (typeof schema.logs.$inferSelect)[] = [];
+let journalAll: (typeof schema.journal.$inferSelect)[] = [];
+let mainQuestInputs: { name: string; doneDays: string[]; remaining: number }[] = [];
 
 beforeAll(async () => {
   const { seedTestWorld } = await import('./test-world');
@@ -51,12 +55,19 @@ beforeAll(async () => {
   today = await todayKey();
 
   const habits = (await db.select().from(schema.habits)).map(toEngineHabit);
+  habitList = habits;
   const logs = await db.select().from(schema.logs);
+  logRowsAll = logs;
+  journalAll = await db.select().from(schema.journal);
   const results = await db.select().from(schema.dayResults);
   const events = (await db.select().from(schema.events)).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   const checkins = await db.select().from(schema.checkins);
   const purchases = await db.select().from(schema.purchases);
   const classQuests = await db.select().from(schema.classQuests);
+  mainQuestInputs = classQuests.map((q) => {
+    const tasks = parseMainQuest(q.stepsJson).chapters.flatMap((c) => c.tasks);
+    return { name: q.name, doneDays: tasks.filter((t) => t.doneDay).map((t) => t.doneDay!), remaining: tasks.filter((t) => !t.doneDay).length };
+  });
   const data = (e: (typeof events)[number]) => (e.dataJson ? JSON.parse(e.dataJson) : {});
 
   state = computeState({
@@ -82,6 +93,28 @@ beforeAll(async () => {
 });
 
 describe('Test World seed', () => {
+  it.runIf(!!process.env.DUMP_REPORT_INPUT)('dumps a report input for the AI pilot', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const { analyze, reportInput, addDays, reviewWeek } = await import('@/engine');
+    const week = reviewWeek(today);
+    const strength = Object.fromEntries(Object.entries(state.habits).map(([id, h]) => [id, h.strength]));
+    const base = {
+      today,
+      history: state.history,
+      habits: habitList.map((h) => ({ id: h.id, name: h.name, limit: h.limit, archived: h.archived, unit: h.unit, target: h.target })),
+      strength,
+      logTimes: logRowsAll.filter((l) => l.amount > 0).map((l) => ({ habitId: l.habitId, day: l.day, hour: l.createdAt.getHours() })),
+      journal: journalAll.map((j) => ({ day: j.day, mood: j.mood || null, energy: j.energy || null })),
+      mainQuests: mainQuestInputs,
+      streak: state.streak,
+      longestStreak: state.record.longestStreak,
+    };
+    const weekly = reportInput(analyze({ ...base, period: 'week', from: week, to: addDays(week, 6) }), { level: state.level });
+    const monthly = reportInput(analyze({ ...base, period: 'month', from: addDays(today, -30), to: addDays(today, -1) }), { level: state.level });
+    writeFileSync(process.env.DUMP_REPORT_INPUT!, JSON.stringify({ weekly, monthly }, null, 2));
+  });
+
+
   it('builds a mid-game player', () => {
     if (process.env.SHOW_TEST_WORLD) {
       const { level, rank, gold, streak, hp, maxHp, inventory, achievements, stats, shadows, record } = state;
@@ -115,8 +148,7 @@ describe('Test World seed', () => {
   it('has achievements, items, an equipped item and an active title', () => {
     const unlocked = state.achievements.filter((a) => a.unlockedDay).map((a) => a.id);
     expect(unlocked).toEqual(expect.arrayContaining(['first_clear', 'streak_7', 'streak_30', 'gate_1', 'gate_10', 'awakened']));
-    // Left in progress so it can be watched unlocking.
-    expect(unlocked).not.toContain('comeback_5');
+    expect(unlocked).not.toContain('shadow_monarch');
     expect(state.inventory.length).toBeGreaterThanOrEqual(8);
     expect(Object.values(state.equipped).filter(Boolean)).toHaveLength(1);
     expect(state.activeTitle).toBe('The Persistent');

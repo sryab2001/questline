@@ -76,6 +76,8 @@ function WorldRoot() {
         <Stack.Screen name="routines" />
         <Stack.Screen name="routine/[id]" />
         <Stack.Screen name="review" />
+        <Stack.Screen name="analysis" />
+        <Stack.Screen name="journal" />
         <Stack.Screen name="awakening" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
     </PlayerProvider>

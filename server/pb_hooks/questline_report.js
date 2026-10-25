@@ -115,18 +115,84 @@ function summarize(userId) {
   };
 }
 
-const SYSTEM_PROMPT = [
-  'You are "the System" from a Solo Leveling-style habit app called Questline. Write the player\'s weekly report.',
-  'Voice: terse, formal, a little mechanical, encouraging without guilt. Address the player as "Player".',
-  'Use only the numbers given. Limit Quests (limitQuest: true) are kept by staying UNDER the target; their totals are minutes used.',
-  'Structure, under 170 words, plain text, these exact headings:',
-  'VERDICT: one line.',
-  'GAINS: one or two specific wins with numbers.',
-  'WEAK POINT: the single biggest problem and a likely cause.',
-  'ADJUSTMENTS: exactly two concrete changes for next week (e.g. lower a target, add a minimum, move the cue, plan the weak day).',
-  'MAIN QUEST: one sentence on progress, if there are Main Quests.',
-  'No medical, legal or financial advice. No emojis.',
-].join('\n');
+// Prompts tuned in the pilot (docs/behavior-design.md): the app computes every finding;
+// the model only ranks and explains them, in the System's voice.
+const RULES = [
+  'Rules:',
+  '- "findings" are computed facts, ranked most important first, each tagged with its kind in brackets. Use only patterns that appear in the findings; never call a habit an anchor unless an [anchor habit] finding says so.',
+  '- Use only the numbers given; never compute new ones. "change" already states whether this period is up or down; repeat it, do not reinterpret it.',
+  '- Targets and limits are PER DAY. Limit Quests are kept by staying UNDER their daily limit.',
+  '- After each claim, cite its number in brackets, e.g. "Run anchors Study GenAI [96% vs 0%]".',
+  '- Every order reads exactly "If <specific situation>, then <one small action>." Prefer shrinking a target, moving a cue, a fixed time slot or a Minimum Clear over "try harder".',
+  '- If playerWriting is given, use it to explain causes; never quote it at length.',
+  '- No emojis. No medical, legal or financial advice. Plain text.',
+];
+
+const PROMPTS = {
+  week: [
+    'You are "the System" from Questline, a Solo Leveling-style habit app. Voice: terse, formal, slightly mechanical; never shaming. Address the player as "Player".',
+  ]
+    .concat(RULES)
+    .concat([
+      'Write under 150 words with these headings, each on its own line:',
+      'STATUS: one line with this period, its change, and the streak.',
+      'KEEP: the top positive finding ([anchor habit], [mood link], [time of day], [streak], [recovery]) and why it matters.',
+      'THREAT: the top negative finding ([screen time], [weak weekday], [target too high], [strength trend] falling) and its likely cause.',
+      'ORDERS: exactly two orders aimed at the threat.',
+      'MAIN QUEST: one sentence per quest in mainQuests (pace and finish estimate); omit the heading if mainQuests is empty.',
+    ])
+    .join('\n'),
+  month: [
+    'You are "the System" from Questline, a Solo Leveling-style habit app, writing the end-of-Season analysis. Voice: formal, precise, a little ceremonial; never shaming. Address the player as "Player".',
+  ]
+    .concat(RULES)
+    .concat([
+      'Write under 260 words with these headings, each on its own line:',
+      'SEASON VERDICT: two lines: this period with its change, the streak and Gates.',
+      'WHAT DRIVES YOU: two or three positive findings, with numbers.',
+      'WHAT BREAKS YOU: the two top negative findings, with numbers.',
+      'NEXT SEASON ORDERS: exactly three orders, each tied to one finding above.',
+      'MAIN QUEST: pace and finish estimate per quest in mainQuests; omit the heading if mainQuests is empty.',
+    ])
+    .join('\n'),
+  // When the app hasn't sent its analysis yet: the older, simpler weekly summary.
+  legacy: [
+    'You are "the System" from a Solo Leveling-style habit app called Questline. Write the player\'s weekly report.',
+    'Voice: terse, formal, a little mechanical, encouraging without guilt. Address the player as "Player".',
+    'Use only the numbers given. Limit Quests (limitQuest: true) are kept by staying UNDER the target; their totals are minutes used.',
+    'Under 170 words, plain text, these headings: VERDICT (one line), GAINS (one or two wins with numbers), WEAK POINT (biggest problem, likely cause), ADJUSTMENTS (exactly two concrete changes), MAIN QUEST (one sentence, if any).',
+    'No medical, legal or financial advice. No emojis.',
+  ].join('\n'),
+};
+
+const MAX_INPUT_CHARS = 30000;
+
+/** The player's own writing goes to the AI only if their settings allow it. */
+function allowsWriting(userId) {
+  try {
+    return !!$app.findRecordById('settings', 'settings-' + userId).get('ai_reads_writing');
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Validates the analysis the app sent; returns a clean copy, or null if unusable. */
+function cleanInput(userId, input, period) {
+  if (!input || typeof input !== 'object' || input.period !== period || !input.to) return null;
+  const copy = JSON.parse(JSON.stringify(input));
+  if (!allowsWriting(userId)) delete copy.playerWriting;
+  if (JSON.stringify(copy).length > MAX_INPUT_CHARS) {
+    delete copy.playerWriting;
+    if (JSON.stringify(copy).length > MAX_INPUT_CHARS) return null;
+  }
+  return copy;
+}
+
+/** The latest analysis the app saved for a period (synced as an event), if any. */
+function savedInput(userId, period) {
+  const rows = list('events', "owner = {:o} && deleted_at = 0 && kind = 'report_input' && ref = {:r}", '-created', 1, { o: userId, r: period });
+  return rows.length ? cleanInput(userId, parseJson(rows[0].getString('data_json'), null), period) : null;
+}
 
 /** Preferred general chat models, best first; used when the configured one isn't available. */
 const PREFERRED = [/gpt-oss-120b/, /llama-3\.3-70b/, /llama-4/, /qwen/, /gpt-oss/, /llama/, /mistral|gemma|kimi|deepseek/];
@@ -156,7 +222,7 @@ function reasoningParams(model) {
   return {};
 }
 
-function chat(key, model, summary) {
+function chat(key, model, prompt, data) {
   return $http.send({
     url: env('AI_API_URL', DEFAULT_URL),
     method: 'POST',
@@ -170,8 +236,8 @@ function chat(key, model, summary) {
           // Reasoning models spend tokens thinking before they answer; leave room for both.
           max_tokens: 2000,
           messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: 'Weekly data:' + String.fromCharCode(10) + JSON.stringify(summary) },
+            { role: 'system', content: prompt },
+            { role: 'user', content: 'Data:' + String.fromCharCode(10) + JSON.stringify(data) },
           ],
         },
         reasoningParams(model),
@@ -182,18 +248,19 @@ function chat(key, model, summary) {
 
 const errorText = (res) => (res.json && res.json.error && res.json.error.message ? res.json.error.message : 'HTTP ' + res.statusCode);
 
-function writeReport(summary) {
+function writeReport(data, promptName) {
+  const prompt = PROMPTS[promptName];
   const key = env('GROQ_API_KEY', '');
   if (!key) throw new BadRequestError('The AI report is not set up on this server yet (GROQ_API_KEY is missing).');
   let model = env('GROQ_MODEL', DEFAULT_MODEL);
-  let res = chat(key, model, summary);
+  let res = chat(key, model, prompt, data);
   // The configured model isn't offered to this key (providers retire and rename models):
   // pick one that is, so the report keeps working without a config change.
   if (res.statusCode === 404 || (res.statusCode === 400 && /model/i.test(errorText(res)))) {
     const fallback = pickModel(key);
     if (fallback && fallback !== model) {
       model = fallback;
-      res = chat(key, model, summary);
+      res = chat(key, model, prompt, data);
     }
   }
   if (res.statusCode !== 200) throw new BadRequestError('The AI service refused the request: ' + errorText(res));
@@ -204,44 +271,63 @@ function writeReport(summary) {
   return { model: model, text: text };
 }
 
-function save(userId, through, report) {
+function save(userId, period, through, report) {
   const record = new Record($app.findCollectionByNameOrId('reports'));
   record.set('owner', userId);
+  record.set('period', period);
   record.set('through', through);
   record.set('body', report.text);
   record.set('model', report.model);
   $app.save(record);
-  return { id: record.id, through: through, body: report.text, model: report.model, created: record.getString('created') };
+  return { id: record.id, period: period, through: through, body: report.text, model: report.model, created: record.getString('created') };
 }
 
-/** Writes a report now for one player (the app's "Ask the System" button). */
-function generateFor(userId) {
+/**
+ * Writes a report now for one player (the app's "Ask the System" button). The app
+ * sends its computed analysis; without one, the server summarises raw data (weekly).
+ */
+function generateFor(userId, body) {
+  const period = body && body.period === 'month' ? 'month' : 'week';
   const last = list('reports', 'owner = {:o}', '-created', 1, { o: userId });
   if (last.length) {
     const created = new Date(last[0].getString('created').replace(' ', 'T')).getTime();
     if (Date.now() - created < MANUAL_COOLDOWN_MS) throw new TooManyrequestsError('A report was just written. Try again in a few minutes.');
   }
+  const input = cleanInput(userId, body && body.input, period);
+  if (input) return save(userId, period, input.to, writeReport(input, period));
+  if (period === 'month') throw new BadRequestError('Open the Season analysis in the app first, so it can send the numbers.');
   const summary = summarize(userId);
   if (!summary) throw new BadRequestError('Not enough history yet: close a few more days first.');
-  return save(userId, summary.through, writeReport(summary));
+  return save(userId, 'week', summary.through, writeReport(summary, 'legacy'));
 }
 
-/** Sunday job: a report for every player who opted in, once per week of data. */
-function generateWeekly() {
+/** Scheduled job: a report for every player who opted in, once per period of data. */
+function generateScheduled(period) {
   if (!env('GROQ_API_KEY', '')) return;
   const optedIn = list('settings', 'ai_report = true', '', 500, {});
-  optedIn.forEach((s) => {
-    const userId = s.getString('owner');
+  optedIn.forEach((st) => {
+    const userId = st.getString('owner');
     try {
-      const summary = summarize(userId);
-      if (!summary) return;
-      const done = list('reports', 'owner = {:o} && through = {:t}', '', 1, { o: userId, t: summary.through });
+      const input = savedInput(userId, period);
+      const data = input || (period === 'week' ? summarize(userId) : null);
+      if (!data) return;
+      const through = input ? input.to : data.through;
+      const done = list('reports', 'owner = {:o} && through = {:t} && period = {:p}', '', 1, { o: userId, t: through, p: period });
       if (done.length) return;
-      save(userId, summary.through, writeReport(summary));
+      save(userId, period, through, writeReport(data, input ? period : 'legacy'));
     } catch (e) {
-      console.log('questline weekly report failed for ' + userId + ': ' + e);
+      console.log('questline ' + period + ' report failed for ' + userId + ': ' + e);
     }
   });
 }
 
-module.exports = { summarize: summarize, generateFor: generateFor, generateWeekly: generateWeekly };
+module.exports = {
+  summarize: summarize,
+  generateFor: generateFor,
+  generateWeekly: function () {
+    generateScheduled('week');
+  },
+  generateMonthly: function () {
+    generateScheduled('month');
+  },
+};

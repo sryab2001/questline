@@ -27,7 +27,10 @@ export default function RecordScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenHeader title="HUNTER'S RECORD" />
 
-        <SysButton label="WEEKLY REVIEW" variant="ghost" onPress={() => router.push('/review')} />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <SysButton label="HUNTER ANALYSIS" style={{ flex: 1 }} onPress={() => router.push({ pathname: '/analysis', params: { period: 'week' } })} />
+          <SysButton label="WEEKLY REVIEW" variant="ghost" style={{ flex: 1 }} onPress={() => router.push('/review')} />
+        </View>
 
         <PatternsWindow history={player.state.history} today={player.today} />
 

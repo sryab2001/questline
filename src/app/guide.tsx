@@ -71,7 +71,14 @@ const SECTIONS: { title: string; body: string[] }[] = [
     body: [
       'On Sundays and Mondays the System asks for a five-minute review: the week in numbers, quick fixes for quests that slipped (lower the target, add a minimum), what worked, what got in the way, and next week’s focus and Main Quest goals. Planning ahead like this is one of the better-evidenced habit techniques.',
       'The Record shows patterns from your history: your weakest weekday, quests that keep ending on the minimum, and quests that have become automatic.',
-      'If your server has an AI key, the System can also write the week’s report from your numbers and quest names (never your notes). Turn on the Sunday report in Settings → Sync.',
+      'The Hunter Analysis (Record → Hunter Analysis) goes deeper, for the week or the last Season: anchor habits (one habit that makes another likely), weak weekdays, your usual time for each quest, screen time against missed quests, how mood follows your habits, and Main Quest finish estimates. It is all computed on your phone from your history.',
+      'If your server has an AI key, the System writes the report from that analysis: weekly, and at the end of each Season. It sees numbers, quest names and patterns; your journal and reflections only if you allow it in Settings → Sync.',
+    ],
+  },
+  {
+    title: 'JOURNAL',
+    body: [
+      'An optional page for a few lines a day and how you felt (mood and energy). No streak, no reminders: skip it whenever you like. Writing things down helps some people think; the ratings show which habits lift your mood.',
     ],
   },
   {

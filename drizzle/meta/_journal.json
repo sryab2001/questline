@@ -50,6 +50,13 @@
       "when": 1792847839611,
       "tag": "0006_ai_report",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792906999495,
+      "tag": "0007_journal",
+      "breakpoints": true
     }
   ]
 }

@@ -77,8 +77,8 @@ export function SyncPanel() {
             <View style={{ flex: 1 }}>
               <SysText style={{ fontSize: 14, color: colors.text }}>Weekly AI report</SysText>
               <SysText variant="caption" style={{ fontSize: 11, lineHeight: 16 }}>
-                Sundays, your server sends the week&apos;s numbers and quest names (never notes) to the AI service it&apos;s set up with,
-                and the report appears in the weekly review.
+                Sundays (and on the 1st for the Season), your server writes a report from the app&apos;s analysis with the AI service
+                it&apos;s set up with. It appears in the weekly review and the Hunter Analysis.
               </SysText>
             </View>
             <Switch
@@ -87,6 +87,24 @@ export function SyncPanel() {
               trackColor={{ true: colors.borderDone, false: colors.borderMuted }}
               thumbColor={player.settings.aiReport ? colors.gold : colors.textMuted}
               accessibilityLabel="Weekly AI report"
+            />
+          </View>
+        ) : null}
+        {player ? (
+          <View style={styles.aiRow}>
+            <View style={{ flex: 1 }}>
+              <SysText style={{ fontSize: 14, color: colors.text }}>Let the System read my writing</SysText>
+              <SysText variant="caption" style={{ fontSize: 11, lineHeight: 16 }}>
+                Adds your journal text and weekly-review reflections to what the AI report reads, for more personal advice. Off: only
+                numbers, quest names and patterns are sent. Mood ratings always stay as numbers.
+              </SysText>
+            </View>
+            <Switch
+              value={player.settings.aiReadsWriting}
+              onValueChange={(v) => updateSettings({ aiReadsWriting: v })}
+              trackColor={{ true: colors.borderDone, false: colors.borderMuted }}
+              thumbColor={player.settings.aiReadsWriting ? colors.gold : colors.textMuted}
+              accessibilityLabel="Let the System read my writing"
             />
           </View>
         ) : null}

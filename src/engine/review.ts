@@ -149,3 +149,9 @@ export function findPatterns(history: DaySummary[], today: DayKey): Patterns {
 
   return { weekdayMissed, weekdayDays, weakestDay, quests, suggestions: suggestions.slice(0, 4) };
 }
+
+/** The last full calendar month (the Season a monthly report covers). */
+export function previousMonthRange(today: DayKey): { from: DayKey; to: DayKey } {
+  const to = addDays(`${today.slice(0, 7)}-01`, -1);
+  return { from: `${to.slice(0, 7)}-01`, to };
+}

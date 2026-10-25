@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Chip } from '@/components/chip';
+import { ReportCard } from '@/components/report-card';
 import { ScreenHeader } from '@/components/screen-header';
 import { SysButton } from '@/components/sys-button';
 import { SysText } from '@/components/sys-text';
@@ -11,9 +12,7 @@ import { SystemWindow } from '@/components/system-window';
 import { type ReviewData, saveReview, updateHabit } from '@/db/actions';
 import { addDays, currentChapter, findPatterns, niceTarget, reviewWeek, taskOpen, weekSummary } from '@/engine';
 import { usePlayerState } from '@/hooks/use-player-state';
-import { cachedReport, fetchLatestReport, requestReport, type WeeklyReport } from '@/review/report';
 import { playEvent } from '@/sound';
-import { useSyncStatus } from '@/sync/status';
 import { colors, fonts } from '@/theme';
 
 const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
@@ -21,7 +20,6 @@ const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(und
 /** Sunday/Monday review: what happened, what to change, and what to aim for next week. */
 export default function ReviewScreen() {
   const player = usePlayerState();
-  const signedIn = useSyncStatus().signedIn;
   const week = player ? reviewWeek(player.today) : '';
   const saved = player?.reviews.find((r) => r.week === week)?.data;
 
@@ -29,36 +27,13 @@ export default function ReviewScreen() {
   const [blocked, setBlocked] = useState(saved?.blocked ?? '');
   const [focus, setFocus] = useState<string | null>(saved?.focus ?? null);
   const [planned, setPlanned] = useState<ReviewData['planned']>(saved?.planned ?? []);
-  const [report, setReport] = useState<WeeklyReport | null>(cachedReport);
-  const [asking, setAsking] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
   const [adjusted, setAdjusted] = useState<string[]>([]);
-
-  // Pick up a report the server wrote on Sunday.
-  useEffect(() => {
-    if (!signedIn) return;
-    fetchLatestReport()
-      .then((r) => r && setReport(r))
-      .catch(() => {});
-  }, [signedIn]);
 
   if (!player) return null;
   const { state, habits } = player;
   const summary = weekSummary(state.history, week);
   const patterns = findPatterns(state.history, player.today);
   const previous = [...player.reviews].reverse().find((r) => r.week < week);
-
-  const ask = async () => {
-    setAsking(true);
-    setReportError(null);
-    try {
-      setReport(await requestReport());
-    } catch (e) {
-      setReportError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setAsking(false);
-    }
-  };
 
   const lower = async (name: string) => {
     const h = habits.find((x) => x.name === name);
@@ -175,30 +150,9 @@ export default function ReviewScreen() {
           </SystemWindow>
         ) : null}
 
-        <SystemWindow title="THE SYSTEM'S REPORT" variant="gold">
-          {report && report.through >= week ? (
-            <>
-              <SysText style={{ fontSize: 14, lineHeight: 21, color: colors.text }}>{report.body}</SysText>
-              <SysText variant="caption" style={{ fontSize: 10 }}>
-                Through {dayLabel(report.through)} · {report.model}
-              </SysText>
-            </>
-          ) : (
-            <SysText variant="caption" style={{ lineHeight: 18 }}>
-              {signedIn
-                ? 'Your server can write this week’s report with AI from your numbers and quest names (never your notes).'
-                : 'Sign in to your server (Settings → Sync) to get an AI-written report.'}
-            </SysText>
-          )}
-          {reportError ? <SysText style={{ fontSize: 12, color: colors.dangerSoft }}>{reportError}</SysText> : null}
-          {signedIn ? (
-            asking ? (
-              <ActivityIndicator color={colors.gold} />
-            ) : (
-              <SysButton label={report && report.through >= week ? 'ASK AGAIN' : 'ASK THE SYSTEM'} variant="gold" onPress={ask} />
-            )
-          ) : null}
-        </SystemWindow>
+        <SysButton label="FULL HUNTER ANALYSIS" variant="ghost" onPress={() => router.push({ pathname: '/analysis', params: { period: 'week' } })} />
+
+        <ReportCard player={player} period="week" />
 
         <SystemWindow title="NEXT WEEK">
           <SysText variant="label" style={{ fontSize: 12 }}>

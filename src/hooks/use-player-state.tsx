@@ -7,8 +7,10 @@ import {
   checkinsQuery,
   classQuestsQuery,
   closePendingDays,
+  journalQuery,
   recordScreenTime,
   type ReviewData,
+  saveReportInput,
   routinesQuery,
   dayResultsQuery,
   eventsQuery,
@@ -22,7 +24,7 @@ import {
   toEngineHabit,
   updateSettings,
 } from '@/db/actions';
-import { isTestWorld } from '@/db/client';
+import { isTestWorld, readMeta, writeMeta } from '@/db/client';
 import {
   addDays,
   type BoxResult,
@@ -50,6 +52,7 @@ import * as Notifications from 'expo-notifications';
 import { claimFinishedDungeon } from '@/dungeon';
 import { syncReminders } from '@/notifications';
 import { handleNotificationAction, saveSnapshot } from '@/quick/today';
+import { buildReportInput } from '@/review/report-input';
 import { setSoundEnabled } from '@/sound';
 import { initSync, syncNow } from '@/sync/engine';
 import { getSyncStatus, useSyncStatus } from '@/sync/status';
@@ -109,6 +112,7 @@ export interface PlayerData {
     title: string;
     urgentFrequency: UrgentFrequency;
     aiReport: boolean;
+    aiReadsWriting: boolean;
   };
   today: string;
   now: Date;
@@ -130,6 +134,18 @@ export interface PlayerData {
   routines: RoutineRow[];
   /** Weekly reviews by week start, latest save wins. */
   reviews: { week: string; data: ReviewData }[];
+  /** Journal entries, newest day first (one per day; latest edit wins). */
+  journal: JournalEntry[];
+  /** When each log was written (local hour), for time-of-day patterns. */
+  logTimes: { habitId: string; day: string; hour: number }[];
+}
+
+export interface JournalEntry {
+  id: string;
+  day: string;
+  mood: number;
+  energy: number;
+  text: string;
 }
 
 export interface RoutineRow {
@@ -156,6 +172,7 @@ function useComputePlayer(): PlayerData | null {
   const { data: eventRows } = useLiveQuery(eventsQuery());
   const { data: classRows } = useLiveQuery(classQuestsQuery());
   const { data: routineRows } = useLiveQuery(routinesQuery());
+  const { data: journalRows } = useLiveQuery(journalQuery());
   const now = useNow();
 
   const player = useMemo((): PlayerData | null => {
@@ -272,6 +289,7 @@ function useComputePlayer(): PlayerData | null {
         title: s.title,
         urgentFrequency,
         aiReport: s.aiReport,
+        aiReadsWriting: s.aiReadsWriting,
       },
       today,
       now,
@@ -288,8 +306,11 @@ function useComputePlayer(): PlayerData | null {
       reviews: [...new Map(ordered.filter((e) => e.kind === 'review').map((e) => [e.ref, data(e) as ReviewData])).entries()]
         .map(([week, d]) => ({ week, data: d }))
         .sort((a, b) => (a.week < b.week ? -1 : 1)),
+      journal: [...new Map(journalRows.map((j) => [j.day, j])).values()].map((j) => ({ id: j.id, day: j.day, mood: j.mood, energy: j.energy, text: j.text })),
+      // Only additions say when a quest was done; corrections (negative logs) don't.
+      logTimes: logRows.filter((l) => l.amount > 0).map((l) => ({ habitId: l.habitId, day: l.day, hour: l.createdAt.getHours() })),
     };
-  }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows, routineRows, now]);
+  }, [settingsRows, habitRows, logRows, resultRows, purchaseRows, skillRows, allocationRows, storeRows, checkinRows, eventRows, classRows, routineRows, journalRows, now]);
 
   return player;
 }
@@ -392,6 +413,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // widgetKey captures every field the widget shows.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [widgetKey]);
+
+  // Scheduled AI reports: once a day, save the current analysis so the server's Sunday
+  // and 1st-of-month jobs write from the same numbers the app shows.
+  const aiReport = player?.settings.aiReport ?? false;
+  const signedIn = useSyncStatus().signedIn;
+  useEffect(() => {
+    if (!player || !aiReport || !signedIn || isTestWorld()) return;
+    for (const period of ['week', 'month'] as const) {
+      const key = `report_input_day:${period}`;
+      if (readMeta(key) === player.today) continue;
+      writeMeta(key, player.today);
+      saveReportInput(period, buildReportInput(player, period)).catch(() => {});
+    }
+    // Once per day per period; player changes during the day don't need a new save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today, aiReport, signedIn]);
 
   // Notification buttons pressed while the app is open.
   useEffect(() => {
